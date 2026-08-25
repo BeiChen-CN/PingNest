@@ -156,6 +156,8 @@ resources/runtime/win32/
 
 请勿随意替换、重命名或删除这些文件。`electron-builder` 会在构建时将相关资源复制到安装包，并解包需要直接加载的原生依赖。
 
+其中 `wx_key.dll` 使用 [lulu1113/wx_key2](https://github.com/lulu1113/wx_key2) 发布的 MIT 许可构建版本。分发或修改该文件时请保留其 MIT 许可声明；该组件仅用于本地 Windows x64 微信兼容性测试。
+
 ## 故障排查
 
 ### 无法检测到微信
