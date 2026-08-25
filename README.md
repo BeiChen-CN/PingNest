@@ -13,6 +13,8 @@
   ·
   <a href="https://github.com/BeiChen-CN/PingNest/issues">问题反馈</a>
   ·
+  <a href="CHANGELOG.md">更新日志</a>
+  ·
   <a href="LICENSE">许可证</a>
 </p>
 
@@ -197,7 +199,6 @@ WeFlow、CipherTalk 或其他项目提供的授权 DLL 不能直接替换 PingNe
 - 按“首次使用”中的顺序操作：先点击 PingNest 的“开始连接”，再点击微信“登录”。
 - 如果微信要求重新登录，请按照应用提示完成扫码或登录确认。
 - 确认 `resources/key/win32/x64/wx_key.dll` 存在且未被隔离。
-
 
 ### 无法读取通知历史
 
