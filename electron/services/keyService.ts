@@ -561,6 +561,13 @@ export class KeyService {
     if (!ok) {
       const error = this.getLastErrorMsg ? this.decodeCString(this.getLastErrorMsg()) : ''
       if (error) {
+        const normalizedError = error.toLowerCase()
+        if (normalizedError.includes('auth_failed') && normalizedError.includes('auth_env_missing')) {
+          return {
+            success: false,
+            error: '当前 wx_key.dll 需要 WeFlow 授权环境，不能用于 PingNest。请恢复 PingNest 配套的 wx_key.dll。'
+          }
+        }
         if (error.includes('0xC0000022') || error.includes('ACCESS_DENIED') || error.includes('打开目标进程失败')) {
           return {
             success: false,

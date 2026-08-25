@@ -265,7 +265,7 @@ export class WcdbCore {
 
   private formatInitProtectionError(code: number): string {
     const messages: Record<number, string> = {
-      '-1006': 'WCDB 授权已过期或宿主校验失败，请替换为有效的 wcdb_api.dll（不能通过修改 PingNest 名称解决）',
+      '-1006': 'WCDB 授权或宿主环境校验失败。请使用与 PingNest 兼容的 wcdb_api.dll，不要直接使用 WeFlow/CipherTalk 授权版本',
       '-102': 'WCDB 宿主校验失败，请确认使用的是为当前应用构建的 wcdb_api.dll',
       '-101': 'WCDB 授权校验失败，请使用有效且未过期的 wcdb_api.dll',
       '-3001': '未找到数据库目录 (db_storage)，请确认已选择正确的微信数据目录（应包含以 wxid_ 开头的子文件夹）',
