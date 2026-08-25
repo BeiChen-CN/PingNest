@@ -23,7 +23,7 @@ interface RawNotificationData {
   sound?: string
 }
 
-const NOTIFICATION_EXIT_MS = 220
+const NOTIFICATION_EXIT_MS = 260
 
 /**
  * 通知弹窗窗口：
@@ -39,6 +39,7 @@ export default function NotificationWindow() {
   const notificationRef = useRef<NotificationData | null>(null)
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const mergeWindowMsRef = useRef(3500)
 
   useEffect(() => {
@@ -59,9 +60,17 @@ export default function NotificationWindow() {
     }
   }
 
+  const clearClickTimer = () => {
+    if (clickTimerRef.current) {
+      clearTimeout(clickTimerRef.current)
+      clickTimerRef.current = null
+    }
+  }
+
   const dismissWithAnimation = () => {
     clearCloseTimer()
     clearHideTimer()
+    clearClickTimer()
     const current = notificationRef.current
     if (current) setPrevNotification(current)
     notificationRef.current = null
@@ -85,6 +94,7 @@ export default function NotificationWindow() {
     const durationMs = data.durationMs || 5000
     mergeWindowMsRef.current = Math.max(0, Number(data.mergeWindowMs ?? 3500))
     clearHideTimer()
+    clearClickTimer()
 
     if (data.position) setPosition(data.position)
 
@@ -150,6 +160,7 @@ export default function NotificationWindow() {
       remove?.()
       clearCloseTimer()
       clearHideTimer()
+      clearClickTimer()
     }
   }, [])
 
@@ -169,10 +180,17 @@ export default function NotificationWindow() {
     if (notificationRef.current?.clickBehavior === 'none') return
     clearCloseTimer()
     clearHideTimer()
+    clearClickTimer()
+    const current = notificationRef.current
+    if (!current) return
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
+    setPrevNotification(current)
     notificationRef.current = null
     setNotification(null)
-    setPrevNotification(null)
-    window.electronAPI?.notification?.click(sessionId)
+    clickTimerRef.current = setTimeout(() => {
+      clickTimerRef.current = null
+      window.electronAPI?.notification?.click(sessionId)
+    }, reduceMotion ? 0 : NOTIFICATION_EXIT_MS)
   }
 
   // 测量并上报尺寸
