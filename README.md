@@ -171,11 +171,6 @@ resources/runtime/win32/
 - 如果微信要求重新登录，请按照应用提示完成扫码或登录确认。
 - 确认 `resources/key/win32/x64/wx_key.dll` 存在且未被隔离。
 
-如果提示 `错误码: -1006`，表示 `wcdb_api.dll` 的授权或宿主校验失败（当前版本也可能已过期），不是微信登录步骤或 PingNest 的 CompanyName 设置问题。请使用项目维护者提供的有效 WCDB 构建版本；不要通过修改系统时间、文件元数据或跳过初始化校验来规避授权。
-
-如果提示 `错误码: -2301` 且你替换过 `wcdb_api.dll`，请确认使用的是项目资源目录中的 EchoTrace v3.1.0 legacy 构建或项目自行构建的兼容版本。密语/CipherTalk 的 DLL 虽然也是 Windows x64 动态库，但 ABI 和授权流程不同，不能直接替换。
-
-当前 Windows x64 的 `wcdb_api.dll` 来自 [EchoTrace v3.1.0](https://github.com/ycccccccy/echotrace/releases/tag/v3.1.0)，采用 MIT 许可；对应许可文本见 `third_party/licenses/echotrace-MIT.txt`。它不包含 WeFlow 的宿主授权校验，因此不会触发受保护 WeFlow DLL 的 `-1006`。构建或替换底层库前，请先阅读 [自有 wcdb_api.dll 构建说明](docs/wcdb-api-build.md)，不要把 Tencent/WCDB 核心库直接改名为 `wcdb_api.dll`。
 
 ### 无法读取通知历史
 
