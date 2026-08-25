@@ -173,6 +173,8 @@ resources/runtime/win32/
 
 如果提示 `错误码: -1006`，表示 `wcdb_api.dll` 的授权或宿主校验失败（当前版本也可能已过期），不是微信登录步骤或 PingNest 的 CompanyName 设置问题。请使用项目维护者提供的有效 WCDB 构建版本；不要通过修改系统时间、文件元数据或跳过初始化校验来规避授权。
 
+如果提示 `错误码: -2301` 且你替换过 `wcdb_api.dll`，请恢复安装包中的 PingNest 配套版本。密语/CipherTalk 的 DLL 虽然也是 Windows x64 动态库，但缺少 PingNest 所需的 `InitProtection` 接口，不能直接替换。
+
 ### 无法读取通知历史
 
 确认应用具有用户数据目录的读写权限。若历史文件损坏，PingNest 会保留原文件备份并创建新的历史文件；备份文件名会带有 `.corrupt-时间戳` 后缀。

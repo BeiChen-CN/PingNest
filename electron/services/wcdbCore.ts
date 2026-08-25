@@ -314,7 +314,20 @@ export class WcdbCore {
 
       // InitProtection
       try {
-        this.wcdbInitProtection = this.lib.func('int32 InitProtection(const char* resourcePath)')
+        try {
+          this.wcdbInitProtection = this.lib.func('int32 InitProtection(const char* resourcePath)')
+        } catch {
+          // A DLL can load successfully while still exposing a different WCDB ABI.
+          // Report that distinction instead of misleading users with a missing-file error.
+          try {
+            this.lib.func('int32 wcdb_init()')
+            lastDllInitError = '检测到不兼容的 wcdb_api.dll：缺少 InitProtection 接口。请恢复 PingNest 配套文件，不要使用密语/CipherTalk 版本。'
+            this.writeLog('[bootstrap] incompatible wcdb_api.dll: InitProtection export missing', true)
+          } catch {
+            lastDllInitError = this.formatInitProtectionError(-2301)
+          }
+          return false
+        }
         const resourcePaths = [
           dllDir,
           dirname(dllDir),
