@@ -156,8 +156,6 @@ resources/runtime/win32/
 
 请勿随意替换、重命名或删除这些文件。`electron-builder` 会在构建时将相关资源复制到安装包，并解包需要直接加载的原生依赖。
 
-其中 `wx_key.dll` 使用 [lulu1113/wx_key2](https://github.com/lulu1113/wx_key2) 发布的 MIT 许可构建版本。分发或修改该文件时请保留其 MIT 许可声明；该组件仅用于本地 Windows x64 微信兼容性测试。
-
 ## 故障排查
 
 ### 无法检测到微信
@@ -172,6 +170,8 @@ resources/runtime/win32/
 - 按“首次使用”中的顺序操作：先点击 PingNest 的“开始连接”，再点击微信“登录”。
 - 如果微信要求重新登录，请按照应用提示完成扫码或登录确认。
 - 确认 `resources/key/win32/x64/wx_key.dll` 存在且未被隔离。
+
+如果提示 `错误码: -1006`，表示 `wcdb_api.dll` 的授权或宿主校验失败（当前版本也可能已过期），不是微信登录步骤或 PingNest 的 CompanyName 设置问题。请使用项目维护者提供的有效 WCDB 构建版本；不要通过修改系统时间、文件元数据或跳过初始化校验来规避授权。
 
 ### 无法读取通知历史
 
