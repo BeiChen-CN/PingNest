@@ -464,6 +464,7 @@ button:disabled { cursor: not-allowed; }
   .appearance-setting-row small { color: $muted; font-size: 11px; }
   .appearance-click-setting { display: grid; grid-template-columns: minmax(0, 1fr) minmax(180px, 240px); align-items: center; gap: 14px; padding-top: 14px; }
   .appearance-click-setting > label { color: $muted; font-size: 11px; }
+  .appearance-click-hint { grid-column: 1 / -1; margin: -5px 0 0; color: $muted; font-size: 10px; line-height: 1.5; }
 
   .settings-grid { display: grid; grid-template-columns: 1fr 1fr; align-items: start; gap: 10px; }
   .setting-section { min-height: 0; padding: 13px; h2 { margin: 0 0 8px; padding-bottom: 8px; border-bottom: 1px solid $border; font-size: 11px; } > label:not(.range-control) { display: block; margin: 9px 0 4px; color: $muted; font-size: 11px; } > .button { margin: 8px 6px 4px 0; } }

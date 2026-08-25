@@ -338,7 +338,12 @@ export class KeyService {
     return normalized === '微信' || lower === 'wechat' || lower === 'weixin'
   }
 
-  /** 激活已运行的微信主窗口，供通知点击跳转使用。 */
+  /**
+   * 激活已运行的微信主窗口，供通知点击使用。
+   *
+   * 微信不同版本的主窗口标题可能短暂变化，因此优先使用运行进程
+   * PID 识别窗口；只有无法取得 PID 时才退回到标题识别。
+   */
   async focusWeChatWindow(): Promise<boolean> {
     if (!this.ensureWin32() || !this.ensureUser32()) return false
 
@@ -350,12 +355,20 @@ export class KeyService {
     const candidates: Array<{ hWnd: any; pid: number }> = []
     const enumWindowsCallback = this.koffi.register((hWnd: any) => {
       if (!this.IsWindowVisible(hWnd)) return true
-      if (!this.isWeChatWindowTitle(this.getWindowTitle(hWnd))) return true
 
       const pidBuf = Buffer.alloc(4)
       this.GetWindowThreadProcessId(hWnd, pidBuf)
       const pid = pidBuf.readUInt32LE(0)
-      if (pid) candidates.push({ hWnd, pid })
+      if (!pid) return true
+
+      // 已确认微信进程时，不再依赖窗口标题。窗口标题可能是空值，
+      // 或在登录、切换页面时暂时显示为其他文本。
+      if (preferredPid !== null) {
+        if (pid === preferredPid) candidates.push({ hWnd, pid })
+        return true
+      }
+
+      if (this.isWeChatWindowTitle(this.getWindowTitle(hWnd))) candidates.push({ hWnd, pid })
       return true
     }, this.WNDENUMPROC_PTR)
 

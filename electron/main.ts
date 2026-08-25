@@ -587,14 +587,25 @@ if (!gotSingleInstanceLock) {
     createTray()
 
     setNotificationNavigateHandler((sessionId: string) => {
+      const normalizedSessionId = String(sessionId || '').trim()
+      if (normalizedSessionId) {
+        notifyCenterStore.markSessionRead(normalizedSessionId)
+        broadcastNotifyCenter()
+      }
+
       const behavior = configService.get('notificationClickBehavior')
       if (behavior === 'none') return
 
       if (behavior === 'open-wechat') {
         void keyService.focusWeChatWindow().then((focused) => {
-          if (focused) return
+          if (focused) {
+            console.info('[main] 通知点击：已激活微信主窗口，会话=' + normalizedSessionId)
+            return
+          }
+          console.warn('[main] 通知点击：未找到可激活的微信主窗口，会话=' + normalizedSessionId)
           openMainWindowForNotification(sessionId)
         }).catch(() => {
+          console.warn('[main] 通知点击：激活微信窗口异常，会话=' + normalizedSessionId)
           openMainWindowForNotification(sessionId)
         })
         return
