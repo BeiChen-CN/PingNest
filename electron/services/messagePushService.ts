@@ -44,6 +44,7 @@ export class MessagePushService extends EventEmitter {
 
   private debounceTimer: ReturnType<typeof setTimeout> | null = null
   private retryTimer: ReturnType<typeof setTimeout> | null = null
+  private pollTimer: ReturnType<typeof setInterval> | null = null
   private processing = false
   private rerunRequested = false
   private started = false
@@ -58,6 +59,9 @@ export class MessagePushService extends EventEmitter {
   start(): void {
     if (this.started) return
     this.started = true
+    this.pollTimer = setInterval(() => {
+      if (this.started && this.isPushEnabled()) this.scheduleSync(0)
+    }, 2000)
     const generation = ++this.runGeneration
     void this.refreshConfiguration('startup', generation).catch((error) => {
       console.warn('[MessagePushService] startup refresh failed:', error)
@@ -70,6 +74,10 @@ export class MessagePushService extends EventEmitter {
     this.processing = false
     this.rerunRequested = false
     this.resetRuntimeState()
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer)
+      this.pollTimer = null
+    }
   }
 
   handleDbMonitorChange(type: string, json: string): void {

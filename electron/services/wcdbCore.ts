@@ -106,8 +106,11 @@ export class WcdbCore {
   /** 命名管道监控：微信数据库变化时回调 (type, json) */
   startMonitor(callback: (type: string, json: string) => void): boolean {
     if (!this.wcdbStartMonitorPipe) {
-      this.writeLog('[monitor] wcdbStartMonitorPipe 未绑定', true)
-      return false
+      // EchoTrace/legacy builds do not expose the optional named-pipe API.
+      // The message service will use its regular polling loop instead.
+      this.monitorCallback = callback
+      this.writeLog('[monitor] native pipe unavailable; polling fallback enabled', true)
+      return true
     }
     this.monitorCallback = callback
     try {
@@ -312,22 +315,19 @@ export class WcdbCore {
       this.lib = this.koffi.load(dllPath)
       this.writeLog('[bootstrap] koffi.load ok', true)
 
-      // InitProtection
+      // InitProtection is present in the protected WeFlow builds. EchoTrace's
+      // MIT legacy build intentionally has no protection entry point, but does
+      // expose the complete basic wcdb_* ABI and can be used without spoofing
+      // the host executable metadata.
       try {
         try {
           this.wcdbInitProtection = this.lib.func('int32 InitProtection(const char* resourcePath)')
         } catch {
-          // A DLL can load successfully while still exposing a different WCDB ABI.
-          // Report that distinction instead of misleading users with a missing-file error.
-          try {
-            this.lib.func('int32 wcdb_init()')
-            lastDllInitError = '检测到不兼容的 wcdb_api.dll：缺少 InitProtection 接口。请恢复 PingNest 配套文件，不要使用密语/CipherTalk 版本。'
-            this.writeLog('[bootstrap] incompatible wcdb_api.dll: InitProtection export missing', true)
-          } catch {
-            lastDllInitError = this.formatInitProtectionError(-2301)
-          }
-          return false
+          this.wcdbInitProtection = null
+          this.writeLog('[bootstrap] InitProtection export missing; probing legacy ABI', true)
         }
+
+        if (this.wcdbInitProtection) {
         const resourcePaths = [
           dllDir,
           dirname(dllDir),
@@ -366,6 +366,7 @@ export class WcdbCore {
           this.writeLog('[bootstrap] InitProtection failed finalCode=' + finalCode, true)
           return false
         }
+        }
       } catch (e) {
         lastDllInitError = this.formatInitProtectionError(-2301)
         return false
@@ -387,7 +388,11 @@ export class WcdbCore {
       this.wcdbGetMessageCount = this.lib.func('int32 wcdb_get_message_count(int64 handle, const char* username, _Out_ int32* outCount)')
       this.wcdbGetDisplayNames = this.lib.func('int32 wcdb_get_display_names(int64 handle, const char* usernamesJson, _Out_ void** outJson)')
       this.wcdbGetAvatarUrls = this.lib.func('int32 wcdb_get_avatar_urls(int64 handle, const char* usernamesJson, _Out_ void** outJson)')
-      this.wcdbGetContact = this.lib.func('int32 wcdb_get_contact(int64 handle, const char* username, _Out_ void** outJson)')
+      try {
+        this.wcdbGetContact = this.lib.func('int32 wcdb_get_contact(int64 handle, const char* username, _Out_ void** outJson)')
+      } catch {
+        this.wcdbGetContact = null
+      }
 
       try {
         this.wcdbGetGroupNicknames = this.lib.func('int32 wcdb_get_group_nicknames(int64 handle, const char* chatroomId, _Out_ void** outJson)')
@@ -395,14 +400,44 @@ export class WcdbCore {
         this.wcdbGetGroupNicknames = null
       }
 
-      this.wcdbOpenMessageCursor = this.lib.func('int32 wcdb_open_message_cursor(int64 handle, const char* sessionId, int32 batchSize, int32 ascending, int32 beginTimestamp, int32 endTimestamp, _Out_ int64* outCursor)')
+      try {
+        this.wcdbOpenMessageCursor = this.lib.func('int32 wcdb_open_message_cursor(int64 handle, const char* sessionId, int32 batchSize, int32 ascending, int32 beginTimestamp, int32 endTimestamp, _Out_ int64* outCursor)')
+      } catch {
+        this.wcdbOpenMessageCursor = null
+      }
       try {
         this.wcdbOpenMessageCursorLite = this.lib.func('int32 wcdb_open_message_cursor_lite(int64 handle, const char* sessionId, int32 batchSize, int32 ascending, int32 beginTimestamp, int32 endTimestamp, _Out_ int64* outCursor)')
       } catch {
         this.wcdbOpenMessageCursorLite = null
       }
-      this.wcdbFetchMessageBatch = this.lib.func('int32 wcdb_fetch_message_batch(int64 handle, int64 cursor, _Out_ void** outJson, _Out_ int32* outHasMore)')
-      this.wcdbCloseMessageCursor = this.lib.func('int32 wcdb_close_message_cursor(int64 handle, int64 cursor)')
+      try {
+        this.wcdbFetchMessageBatch = this.lib.func('int32 wcdb_fetch_message_batch(int64 handle, int64 cursor, _Out_ void** outJson, _Out_ int32* outHasMore)')
+      } catch {
+        this.wcdbFetchMessageBatch = null
+      }
+      try {
+        this.wcdbCloseMessageCursor = this.lib.func('int32 wcdb_close_message_cursor(int64 handle, int64 cursor)')
+      } catch {
+        this.wcdbCloseMessageCursor = null
+      }
+
+      const requiredLegacy = [
+        ['wcdb_init', this.wcdbInit],
+        ['wcdb_open_account', this.wcdbOpenAccount],
+        ['wcdb_get_sessions', this.wcdbGetSessions],
+        ['wcdb_get_messages', this.wcdbGetMessages],
+        ['wcdb_get_message_count', this.wcdbGetMessageCount],
+        ['wcdb_get_display_names', this.wcdbGetDisplayNames],
+        ['wcdb_get_avatar_urls', this.wcdbGetAvatarUrls]
+      ]
+      if (!this.wcdbInitProtection) {
+        const missing = requiredLegacy.filter(([, fn]) => !fn).map(([name]) => name)
+        if (missing.length > 0) {
+          lastDllInitError = '检测到不兼容的 wcdb_api.dll：缺少基础接口 ' + missing.join(', ')
+          this.writeLog('[bootstrap] legacy ABI rejected missing=' + missing.join(','), true)
+          return false
+        }
+      }
 
       try {
         this.wcdbExecQuery = this.lib.func('int32 wcdb_exec_query(int64 handle, const char* kind, const char* path, const char* sql, _Out_ void** outJson)')
@@ -580,6 +615,49 @@ export class WcdbCore {
     return JSON.parse(normalized)
   }
 
+  /** Normalize EchoTrace snake_case/computed fields to the push service shape. */
+  private normalizeMessages(messages: any[], sessionId: string): any[] {
+    if (!Array.isArray(messages)) return []
+    return messages.map((message: any) => {
+      if (!message || typeof message !== 'object') return message
+      const localId = Number(message.localId ?? message.local_id ?? message.msg_id ?? message.id ?? 0)
+      const createTime = Number(message.createTime ?? message.create_time ?? message.timestamp ?? 0)
+      const serverId = message.serverId ?? message.server_id ?? message.serverIdRaw ?? ''
+      const rawContent = message.rawContent ?? message.raw_content ?? message.message_content ?? message.msg_content ?? message.content ?? ''
+      const parsedContent = message.parsedContent ?? message.parsed_content ?? rawContent
+      const isSend = message.isSend ?? message.is_send ?? message.computed_is_send ?? message.computedIsSend ?? null
+      const messageKey = String(message.messageKey ?? message.message_key ?? '') || [sessionId, localId, createTime, String(serverId)].join(':')
+      return {
+        ...message,
+        messageKey,
+        localId,
+        createTime,
+        serverId: serverId === '' ? undefined : serverId,
+        serverIdRaw: serverId === '' ? undefined : String(serverId),
+        isSend,
+        rawContent: String(rawContent ?? ''),
+        parsedContent: String(parsedContent ?? ''),
+        localType: Number(message.localType ?? message.local_type ?? message.type ?? 0)
+      }
+    })
+  }
+
+  private normalizeSessions(sessions: any[]): any[] {
+    if (!Array.isArray(sessions)) return []
+    return sessions.map((session: any) => {
+      if (!session || typeof session !== 'object') return session
+      const username = String(session.username ?? session.user_name ?? session.session_id ?? session.sessionId ?? session.wxid ?? '').trim()
+      const lastTimestamp = Number(session.lastTimestamp ?? session.last_timestamp ?? session.last_msg_time ?? session.last_message_time ?? session.last_create_time ?? 0)
+      const unreadCount = Number(session.unreadCount ?? session.unread_count ?? session.unread ?? 0)
+      return {
+        ...session,
+        username,
+        last_timestamp: lastTimestamp,
+        unread_count: unreadCount
+      }
+    }).filter((session: any) => session.username)
+  }
+
   async getSessions(): Promise<{ success: boolean; sessions?: any[]; error?: string }> {
     if (!this.ensureReady()) return { success: false, error: 'WCDB 未连接' }
     try {
@@ -590,7 +668,7 @@ export class WcdbCore {
       if (result !== 0 || !outPtr[0]) return { success: false, error: '获取会话失败: ' + result }
       const jsonStr = this.decodeJsonPtr(outPtr[0])
       if (!jsonStr) return { success: false, error: '解析会话失败' }
-      return { success: true, sessions: JSON.parse(jsonStr) }
+      return { success: true, sessions: this.normalizeSessions(JSON.parse(jsonStr)) }
     } catch (e) {
       return { success: false, error: String(e) }
     }
@@ -604,7 +682,7 @@ export class WcdbCore {
       if (result !== 0 || !outPtr[0]) return { success: false, error: '获取消息失败: ' + result }
       const jsonStr = this.decodeJsonPtr(outPtr[0])
       if (!jsonStr) return { success: false, error: '解析消息失败' }
-      return { success: true, messages: this.parseMessageJson(jsonStr) }
+      return { success: true, messages: this.normalizeMessages(this.parseMessageJson(jsonStr), sessionId) }
     } catch (e) {
       return { success: false, error: String(e) }
     }
@@ -634,6 +712,21 @@ export class WcdbCore {
           }
         } finally {
           await this.closeMessageCursor(cursor)
+        }
+      }
+
+      // Legacy builds do not expose cursors or SQL execution. Use the basic
+      // message endpoint as a bounded fallback before trying project SQL.
+      if (!this.wcdbOpenMessageCursorLite && !this.wcdbOpenMessageCursor && this.wcdbGetMessages) {
+        const basic = await this.getMessages(sessionId, Math.min(Math.max(1, Math.floor(Number(limit) || 1000)), 5000), 0)
+        if (basic.success && Array.isArray(basic.messages)) {
+          const since = Math.max(0, Math.floor(Number(minTime) || 0))
+          const messages = basic.messages
+            .filter((message: any) => Number(message?.createTime ?? message?.create_time ?? 0) >= since)
+            .sort((a: any, b: any) => Number(a?.createTime ?? a?.create_time ?? 0) - Number(b?.createTime ?? b?.create_time ?? 0))
+            .slice(0, Math.min(Math.max(1, Math.floor(Number(limit) || 1000)), 5000))
+          this.writeLog('[getNewMessages] legacy endpoint normalized ' + messages.length + ' 条', true)
+          return { success: true, messages }
         }
       }
 
@@ -792,6 +885,7 @@ export class WcdbCore {
     try {
       const outCursor = [0]
       const fn = this.wcdbOpenMessageCursorLite || this.wcdbOpenMessageCursor
+      if (!fn) return { success: false, error: '当前 WCDB 构建不提供消息游标接口' }
       const result = fn(
         this.handle, sessionId, batchSize, ascending ? 1 : 0,
         Math.floor(beginTimestamp), Math.floor(endTimestamp), outCursor
@@ -808,6 +902,7 @@ export class WcdbCore {
   async fetchMessageBatch(cursor: number): Promise<{ success: boolean; rows?: any[]; hasMore?: boolean; error?: string }> {
     if (!this.ensureReady()) return { success: false, error: 'WCDB 未连接' }
     try {
+      if (!this.wcdbFetchMessageBatch) return { success: false, error: '当前 WCDB 构建不提供消息批量接口' }
       const outPtr = [null as any]
       const outHasMore = [0]
       const result = this.wcdbFetchMessageBatch(this.handle, cursor, outPtr, outHasMore)
@@ -821,6 +916,7 @@ export class WcdbCore {
   }
 
   async closeMessageCursor(cursor: number): Promise<{ success: boolean; error?: string }> {
+    if (!this.wcdbCloseMessageCursor) return { success: false, error: '当前 WCDB 构建不提供消息游标接口' }
     try {
       const result = this.wcdbCloseMessageCursor(this.handle, cursor)
       return { success: result === 0, error: result !== 0 ? 'closeMessageCursor failed: ' + result : undefined }
@@ -890,6 +986,7 @@ export class WcdbCore {
 
   async getContact(username: string): Promise<{ success: boolean; contact?: any; error?: string }> {
     if (!this.ensureReady()) return { success: false, error: 'WCDB 未连接' }
+    if (!this.wcdbGetContact) return { success: false, error: '当前 WCDB 构建不提供联系人接口' }
     try {
       const outPtr = [null as any]
       const result = this.wcdbGetContact(this.handle, username, outPtr)
