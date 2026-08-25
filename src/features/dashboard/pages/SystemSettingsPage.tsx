@@ -59,7 +59,7 @@ export function SystemSettingsPage({ config, status, hookBusy, hookProgress, ent
       </section>
       <section className="surface setting-section">
         <h2>启动与托盘</h2>
-        <div className="inline-setting"><div><b>开机自动启动</b></div><Switch checked={config.startupEnabled} onChange={(enabled) => void saveConfig('startupEnabled', enabled)} label="开机自动启动" /></div>
+        <div className="inline-setting"><div><b>开机启动至托盘</b></div><Switch checked={config.startupEnabled} onChange={(enabled) => void saveConfig('startupEnabled', enabled)} label="开机启动至托盘" /></div>
         <div className="inline-setting"><div><b>关闭窗口时隐藏到托盘</b></div><Switch checked={config.closeToTray} onChange={(enabled) => void saveConfig('closeToTray', enabled)} label="关闭窗口时隐藏到托盘" /></div>
         <div className="inline-setting"><div><b>隐藏到托盘时显示提示</b></div><Switch checked={config.trayNotifications} disabled={!config.closeToTray} onChange={(enabled) => void saveConfig('trayNotifications', enabled)} label="隐藏到托盘时显示提示" /></div>
       </section>

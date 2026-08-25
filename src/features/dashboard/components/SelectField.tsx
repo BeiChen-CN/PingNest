@@ -62,6 +62,8 @@ export function SelectField({ value, options, onChange, label, id, disabled = fa
       if (!trigger) return
       const rect = trigger.getBoundingClientRect()
       const desiredHeight = Math.min(menuRef.current?.scrollHeight || options.length * 34 + 8, 224)
+      const longestLabelWidth = Math.max(...options.map((option) => Array.from(option.label).reduce((width, character) => width + (character.charCodeAt(0) > 255 ? 12 : 7), 0)), 0)
+      const menuWidth = Math.max(rect.width, Math.min(320, longestLabelWidth + 48))
       const spaceBelow = window.innerHeight - rect.bottom - 8
       const spaceAbove = rect.top - 8
       const openAbove = spaceBelow < Math.min(desiredHeight, 152) && spaceAbove > spaceBelow
@@ -70,8 +72,8 @@ export function SelectField({ value, options, onChange, label, id, disabled = fa
       const menuHeight = Math.min(desiredHeight, maxHeight)
       setPosition({
         top: openAbove ? Math.max(8, rect.top - menuHeight - 4) : rect.bottom + 4,
-        left: Math.max(8, Math.min(rect.left, window.innerWidth - rect.width - 8)),
-        width: rect.width,
+        left: Math.max(8, Math.min(rect.left, window.innerWidth - menuWidth - 8)),
+        width: menuWidth,
         maxHeight
       })
     }

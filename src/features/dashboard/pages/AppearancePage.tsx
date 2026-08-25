@@ -64,7 +64,7 @@ export function AppearancePage({ config, saveConfig }: { config: AppConfig; save
           <div className="appearance-setting-row"><span className="setting-row-icon"><Eye size={15} /></span><div><b>显示摘要</b><small>在通知中显示消息正文摘要</small></div><Switch checked={config.showNotificationSummary} onChange={(enabled) => void saveConfig('showNotificationSummary', enabled)} label="显示摘要" /></div>
           <div className="appearance-setting-row"><span className="setting-row-icon"><Volume2 size={15} /></span><div><b>通知提示音</b><small>收到新通知时播放提示音</small></div><Switch checked={config.soundEnabled} onChange={(enabled) => void saveConfig('soundEnabled', enabled)} label="通知提示音" /></div>
         </div>
-        <div className="appearance-click-setting"><label htmlFor="click-action">点击通知后</label><SelectField id="click-action" label="点击通知后" value={config.notifyCenterEnabled ? config.notificationClickBehavior : 'none'} disabled={!config.notifyCenterEnabled} options={[{ value: 'open-app', label: '在通知历史中查看' }, { value: 'none', label: '无操作' }]} onChange={(value) => void saveConfig('notificationClickBehavior', value as AppConfig['notificationClickBehavior'])} /></div>
+        <div className="appearance-click-setting"><label htmlFor="click-action">点击通知后</label><SelectField id="click-action" label="点击通知后" value={config.notificationClickBehavior} options={[{ value: 'open-wechat', label: '跳转至微信界面' }, { value: 'open-app', label: '在通知历史中查看' }, { value: 'none', label: '无操作' }]} onChange={(value) => void saveConfig('notificationClickBehavior', value as AppConfig['notificationClickBehavior'])} /></div>
       </section>
     </div>
   </section>

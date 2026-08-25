@@ -1,8 +1,43 @@
 @use '../styles/motion' as *;
 
-@keyframes notification-exit {
-  from { opacity: 1; transform: translateY(0); }
-  to { opacity: 0; transform: translateY(-4px); }
+@keyframes notification-enter-top {
+  from { opacity: 0; transform: translate3d(0, -12px, 0) scale(.985); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes notification-enter-bottom {
+  from { opacity: 0; transform: translate3d(0, 12px, 0) scale(.985); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes notification-enter-left {
+  from { opacity: 0; transform: translate3d(-10px, -2px, 0) scale(.985); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes notification-enter-right {
+  from { opacity: 0; transform: translate3d(10px, -2px, 0) scale(.985); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes notification-exit-top {
+  from { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  to { opacity: 0; transform: translate3d(0, -7px, 0) scale(.985); }
+}
+
+@keyframes notification-exit-bottom {
+  from { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  to { opacity: 0; transform: translate3d(0, 7px, 0) scale(.985); }
+}
+
+@keyframes notification-exit-left {
+  from { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  to { opacity: 0; transform: translate3d(-6px, 0, 0) scale(.985); }
+}
+
+@keyframes notification-exit-right {
+  from { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  to { opacity: 0; transform: translate3d(6px, 0, 0) scale(.985); }
 }
 
 body {
@@ -13,16 +48,49 @@ body {
 }
 
 #notification-current {
-  animation: motion-fade-down $motion-duration-slow $motion-ease-out both;
+  animation-duration: 360ms;
+  animation-timing-function: cubic-bezier(.16, 1, .3, 1);
+  animation-fill-mode: both;
   will-change: transform, opacity;
 }
 
 #notification-prev {
-  animation: notification-exit $motion-duration-base $motion-ease-in both;
+  animation-duration: 210ms;
+  animation-timing-function: cubic-bezier(.4, 0, 1, 1);
+  animation-fill-mode: both;
   transform-origin: center top;
   will-change: transform, opacity;
   z-index: 0 !important;
 }
+
+#notification-current.notification-position-top-right,
+#notification-current.notification-position-top-left,
+#notification-current.notification-position-top-center { animation-name: notification-enter-top; }
+
+#notification-current.notification-position-bottom-right,
+#notification-current.notification-position-bottom-left { animation-name: notification-enter-bottom; }
+
+#notification-prev.notification-position-top-right,
+#notification-prev.notification-position-top-left,
+#notification-prev.notification-position-top-center { animation-name: notification-exit-top; }
+
+#notification-prev.notification-position-bottom-right,
+#notification-prev.notification-position-bottom-left { animation-name: notification-exit-bottom; }
+
+#notification-current.notification-position-top-left,
+#notification-current.notification-position-bottom-left { animation-name: notification-enter-left; }
+
+#notification-current.notification-position-top-right,
+#notification-current.notification-position-bottom-right { animation-name: notification-enter-right; }
+
+#notification-prev.notification-position-top-left,
+#notification-prev.notification-position-bottom-left { animation-name: notification-exit-left; }
+
+#notification-prev.notification-position-top-right,
+#notification-prev.notification-position-bottom-right { animation-name: notification-exit-right; }
+
+#notification-prev.notification-position-bottom-right,
+#notification-prev.notification-position-bottom-left { transform-origin: center bottom; }
 
 @media (prefers-reduced-motion: reduce) {
   #notification-current, #notification-prev {

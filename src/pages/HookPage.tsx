@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   AlertCircle, Check, CheckCircle2, Database, LoaderCircle, LockKeyhole,
-  Maximize2, Minus, RefreshCw, ShieldCheck, Unplug, X
+  Info, Maximize2, Minus, RefreshCw, ShieldCheck, Unplug, X
 } from 'lucide-react'
 import type { HookProgress, HookStage } from '../features/dashboard/types'
 import './HookPage.scss'
@@ -118,6 +118,7 @@ export default function HookPage({ initialWechatRunning, onComplete }: Props) {
         <span className="hook-eyebrow">首次连接</span>
         <h1 id="hook-title">连接微信</h1>
         <p>连接微信后即可开始接收通知。</p>
+        {progress.stage === 'idle' && <div className="hook-guide" role="note"><Info size={15} /><span>请在微信登录界面先点击“开始连接”，然后再点击微信“登录”。</span></div>}
       </section>
 
       <section className="hook-panel">

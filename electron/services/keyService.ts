@@ -39,6 +39,9 @@ export class KeyService {
   private GetClassNameW: any = null
   private GetWindowThreadProcessId: any = null
   private IsWindowVisible: any = null
+  private IsIconic: any = null
+  private ShowWindow: any = null
+  private SetForegroundWindow: any = null
   private EnumChildWindows: any = null
   private WNDENUMPROC_PTR: any = null
 
@@ -150,6 +153,9 @@ export class KeyService {
       this.GetClassNameW = this.user32.func('GetClassNameW', 'int', ['void*', this.koffi.out('uint16*'), 'int'])
       this.GetWindowThreadProcessId = this.user32.func('GetWindowThreadProcessId', 'uint32', ['void*', this.koffi.out('uint32*')])
       this.IsWindowVisible = this.user32.func('IsWindowVisible', 'bool', ['void*'])
+      this.IsIconic = this.user32.func('IsIconic', 'bool', ['void*'])
+      this.ShowWindow = this.user32.func('ShowWindow', 'bool', ['void*', 'int'])
+      this.SetForegroundWindow = this.user32.func('SetForegroundWindow', 'bool', ['void*'])
 
       return true
     } catch (e) {
@@ -330,6 +336,45 @@ export class KeyService {
     if (!normalized) return false
     const lower = normalized.toLowerCase()
     return normalized === '微信' || lower === 'wechat' || lower === 'weixin'
+  }
+
+  /** 激活已运行的微信主窗口，供通知点击跳转使用。 */
+  async focusWeChatWindow(): Promise<boolean> {
+    if (!this.ensureWin32() || !this.ensureUser32()) return false
+
+    let preferredPid: number | null = null
+    try {
+      preferredPid = await this.findWeChatPid(0)
+    } catch { }
+
+    const candidates: Array<{ hWnd: any; pid: number }> = []
+    const enumWindowsCallback = this.koffi.register((hWnd: any) => {
+      if (!this.IsWindowVisible(hWnd)) return true
+      if (!this.isWeChatWindowTitle(this.getWindowTitle(hWnd))) return true
+
+      const pidBuf = Buffer.alloc(4)
+      this.GetWindowThreadProcessId(hWnd, pidBuf)
+      const pid = pidBuf.readUInt32LE(0)
+      if (pid) candidates.push({ hWnd, pid })
+      return true
+    }, this.WNDENUMPROC_PTR)
+
+    try {
+      this.EnumWindows(enumWindowsCallback, 0)
+    } finally {
+      this.koffi.unregister(enumWindowsCallback)
+    }
+
+    const target = candidates.find((candidate) => candidate.pid === preferredPid) || candidates[0]
+    if (!target) return false
+
+    try {
+      if (this.IsIconic(target.hWnd)) this.ShowWindow(target.hWnd, 9)
+      return !!this.SetForegroundWindow(target.hWnd)
+    } catch (error) {
+      console.warn('[KeyService] 激活微信窗口失败:', error)
+      return false
+    }
   }
 
   private getWindowTitle(hWnd: any): string {

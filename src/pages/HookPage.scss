@@ -47,6 +47,7 @@
 .hook-eyebrow { display: block; margin-bottom: 5px; color: $green; font-size: 12px; font-weight: 650; }
 .hook-intro h1 { margin: 0; font-size: 24px; line-height: 1.25; font-weight: 650; }
 .hook-intro p { margin: 7px 0 0; color: $muted; font-size: 13px; }
+.hook-guide { display: flex; align-items: flex-start; gap: 7px; margin: 13px auto 0; padding: 9px 10px; color: #176c43; background: $green-soft; border: 1px solid #c9e7d7; border-radius: 6px; font-size: 12px; line-height: 1.45; text-align: left; svg { flex: 0 0 auto; margin-top: 1px; } }
 
 .hook-panel { width: min(100%, 430px); padding: 18px; background: $surface; border: 1px solid $border; border-radius: 8px; box-shadow: 0 12px 34px rgba(25, 48, 36, .08); }
 .hook-panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding-bottom: 15px; border-bottom: 1px solid $border; > div { min-width: 0; } b, span { display: block; } b { margin-bottom: 4px; font-size: 13px; } > div > span { color: $muted; font-size: 12px; } }

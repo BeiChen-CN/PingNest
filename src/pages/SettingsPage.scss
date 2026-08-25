@@ -75,7 +75,6 @@ button:disabled { cursor: not-allowed; }
       min-width: 0;
       img { width: 17px; height: 17px; border-radius: 4px; }
       b { font-size: 12px; font-weight: 650; }
-      span { color: $muted; font-size: 11px; }
     }
   }
 
@@ -490,7 +489,6 @@ button:disabled { cursor: not-allowed; }
 
 // Keep secondary text compact without dropping below a readable UI size.
 .app-shell {
-  .titlebar .brand span,
   .sidebar button span,
   .summary-item > span,
   .surface-title button,
@@ -593,7 +591,6 @@ button:disabled { cursor: not-allowed; }
     height: auto;
     min-height: 100vh;
     overflow: auto;
-    .titlebar .brand span { display: none; }
     .sidebar { top: auto; right: 0; bottom: 0; width: auto; height: 58px; flex-direction: row; padding: 4px 8px; border-top: 1px solid $border; border-right: 0; nav { flex: 1; flex-direction: row; justify-content: space-around; } button { min-height: 48px; } .sidebar-help { display: none; } }
     .workspace { height: auto; min-height: calc(100vh - 40px); margin-left: 0; padding-bottom: 62px; overflow: visible; }
     .page-heading { align-items: flex-start; flex-direction: column; padding-top: 15px; h1 { font-size: 17px; } }

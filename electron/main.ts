@@ -19,6 +19,7 @@ let trayHintShown = false
 let historyFlushedForQuit = false
 let hookInProgress = false
 let historyCleanupTimer: ReturnType<typeof setInterval> | null = null
+const launchedAtLogin = process.platform === 'win32' && process.argv.includes('--hidden')
 
 type HookStage = 'detecting' | 'waiting-wechat' | 'hooking' | 'verifying' | 'success' | 'error'
 interface HookProgress {
@@ -42,6 +43,7 @@ function createMainWindow(): BrowserWindow {
     minHeight: 640,
     frame: false,
     backgroundColor: '#F6F8F7',
+    show: !launchedAtLogin,
     title: 'PingNest',
     icon: resolveAppIconPath(),
     webPreferences: {
@@ -376,7 +378,7 @@ function handleMessagePush(payload: MessagePushPayload): void {
     mergeWindowMs: cfg.mergeWindowMs,
     opacity: cfg.notificationOpacity,
     showSummary: cfg.showNotificationSummary,
-    clickBehavior: cfg.notifyCenterEnabled ? cfg.notificationClickBehavior : 'none',
+    clickBehavior: cfg.notificationClickBehavior,
     soundEnabled: cfg.soundEnabled,
     sound: effect.sound
   }).catch((e) => console.error('[main] showNotification failed:', e))
@@ -408,7 +410,7 @@ function validateConfigValue(key: keyof ConfigSchema, value: unknown): string | 
   if (key === 'notificationDurationMs' && (!Number.isInteger(value) || Number(value) < 3000 || Number(value) > 15000)) return '通知持续时间超出范围'
   if (key === 'notificationOpacity' && (!Number.isInteger(value) || Number(value) < 70 || Number(value) > 100)) return '通知透明度超出范围'
   if (key === 'mergeWindowMs' && (!Number.isFinite(value) || Number(value) < 0 || Number(value) > 60_000)) return '消息聚合时间超出范围'
-  if (key === 'notificationClickBehavior' && value !== 'open-app' && value !== 'none') return '通知点击行为不受支持'
+  if (key === 'notificationClickBehavior' && value !== 'open-app' && value !== 'open-wechat' && value !== 'none') return '通知点击行为不受支持'
   if (key === 'notificationPosition' && !['top-right', 'top-left', 'bottom-right', 'bottom-left', 'top-center'].includes(String(value))) return '通知位置不受支持'
   if (key === 'notificationStyle' && !['standard', 'compact', 'layered', 'minimal'].includes(String(value))) return '通知样式不受支持'
   if (key === 'notificationFilterMode' && !['all', 'whitelist', 'blacklist'].includes(String(value))) return '通知范围不受支持'
@@ -430,6 +432,15 @@ function validateConfigValue(key: keyof ConfigSchema, value: unknown): string | 
 function cleanupExpiredHistory(): number {
   if (!configService.get('autoCleanupHistory')) return 0
   return notifyCenterStore.cleanupOlderThan(configService.get('historyRetentionDays'))
+}
+
+function syncLoginItemSetting(): void {
+  if (!app.isPackaged) return
+  const args = process.platform === 'win32' ? ['--hidden'] : undefined
+  app.setLoginItemSettings({
+    openAtLogin: configService.get('startupEnabled') === true,
+    args
+  })
 }
 
 // ---------- IPC ----------
@@ -490,8 +501,10 @@ function registerIpcHandlers(): void {
       const previousValue = configService.get(key)
       configService.set(key, value as never)
       if (key === 'startupEnabled') {
-        app.setLoginItemSettings({ openAtLogin: value === true })
-        if (app.isPackaged && app.getLoginItemSettings().openAtLogin !== (value === true)) {
+        const loginItemArgs = process.platform === 'win32' ? ['--hidden'] : undefined
+        app.setLoginItemSettings({ openAtLogin: value === true, args: loginItemArgs })
+        const loginItemSettings = app.getLoginItemSettings({ args: loginItemArgs })
+        if (app.isPackaged && loginItemSettings.openAtLogin !== (value === true)) {
           configService.set(key, previousValue as never)
           return { success: false, error: '系统未能应用开机启动设置' }
         }
@@ -566,6 +579,7 @@ if (!gotSingleInstanceLock) {
     registerIpcHandlers()
     await notifyCenterStore.init()
     cleanupExpiredHistory()
+    syncLoginItemSetting()
     historyCleanupTimer = setInterval(() => {
       if (cleanupExpiredHistory() > 0) broadcastNotifyCenter()
     }, 60 * 60 * 1000)
@@ -573,12 +587,29 @@ if (!gotSingleInstanceLock) {
     createTray()
 
     setNotificationNavigateHandler((sessionId: string) => {
+      const behavior = configService.get('notificationClickBehavior')
+      if (behavior === 'none') return
+
+      if (behavior === 'open-wechat') {
+        void keyService.focusWeChatWindow().then((focused) => {
+          if (focused) return
+          openMainWindowForNotification(sessionId)
+        }).catch(() => {
+          openMainWindowForNotification(sessionId)
+        })
+        return
+      }
+
+      openMainWindowForNotification(sessionId)
+    })
+
+    function openMainWindowForNotification(sessionId: string): void {
       const win = ensureMainWindow()
       if (win.isMinimized()) win.restore()
       win.show()
       win.focus()
       win.webContents.send('navigate-to-session', sessionId)
-    })
+    }
 
     messagePushService.on('message.new', (payload: MessagePushPayload) => handleMessagePush(payload))
     messagePushService.on('message.revoke', (payload: MessagePushPayload) => handleMessagePush(payload))

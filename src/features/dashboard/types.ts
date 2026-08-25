@@ -27,7 +27,7 @@ export interface AppConfig {
   notificationDurationMs: number
   notificationOpacity: number
   showNotificationSummary: boolean
-  notificationClickBehavior: 'open-app' | 'none'
+  notificationClickBehavior: 'open-app' | 'open-wechat' | 'none'
   notifyRules: NotifyRule[]
   notifyCenterEnabled: boolean
   startupEnabled: boolean
@@ -90,6 +90,6 @@ export const DEFAULT_CONFIG: AppConfig = {
   mergeWindowMs: 3500, soundEnabled: true, notificationDurationMs: 5000,
   notificationOpacity: 90, showNotificationSummary: true,
   notificationClickBehavior: 'open-app', notifyRules: [], notifyCenterEnabled: true,
-  startupEnabled: false, closeToTray: true, trayNotifications: true, autoReconnect: true,
+  startupEnabled: true, closeToTray: true, trayNotifications: true, autoReconnect: true,
   reconnectIntervalSeconds: 3, historyRetentionDays: 30, autoCleanupHistory: true
 }

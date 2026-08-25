@@ -48,7 +48,7 @@ export interface ConfigSchema {
   notificationDurationMs: number
   notificationOpacity: number
   showNotificationSummary: boolean
-  notificationClickBehavior: 'open-app' | 'none'
+  notificationClickBehavior: 'open-app' | 'open-wechat' | 'none'
 
   // 规则
   notifyRules: NotifyRule[]
@@ -89,7 +89,7 @@ const DEFAULTS: ConfigSchema = {
 
   notifyCenterEnabled: true,
 
-  startupEnabled: false,
+  startupEnabled: true,
   closeToTray: true,
   trayNotifications: true,
   autoReconnect: true,

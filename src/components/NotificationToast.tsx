@@ -18,7 +18,7 @@ export interface NotificationData {
   mergeCount?: number
   opacity?: number
   showSummary?: boolean
-  clickBehavior?: 'open-app' | 'none'
+  clickBehavior?: 'open-app' | 'open-wechat' | 'none'
   soundEnabled?: boolean
   sound?: string
   receivedAtMs?: number
