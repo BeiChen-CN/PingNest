@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PingNest - MD3 设计方案原型</title>
+  <style>
+    * { box-sizing: border-box; }
+    :root {
+      font-family: "Segoe UI Variable", "Segoe UI", "Microsoft YaHei UI", sans-serif;
+      color: #1a1c1b;
+      background: #eef1ef;
+      font-synthesis: none;
+    }
+    body { margin: 0; min-width: 320px; min-height: 100vh; letter-spacing: 0; }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible { outline: 3px solid var(--focus, #006c4c); outline-offset: 2px; }
+    .prototype-bar {
+      min-height: 76px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      padding: 12px 24px;
+      color: #1a1c1b;
+      background: #fff;
+      border-bottom: 1px solid #d9dedb;
+    }
+    .prototype-title { min-width: 0; }
+    .prototype-title strong { display: block; margin-bottom: 3px; font-size: 15px; }
+    .prototype-title span { color: #58615c; font-size: 12px; }
+    .concept-switcher {
+      flex: 0 0 auto;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(144px, 1fr));
+      padding: 4px;
+      background: #eef2ef;
+      border-radius: 24px;
+    }
+    .concept-switcher button {
+      min-height: 40px;
+      padding: 6px 18px;
+      border: 0;
+      border-radius: 20px;
+      color: #435049;
+      background: transparent;
+      font-size: 12px;
+      font-weight: 650;
+      transition: color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+    }
+    .concept-switcher button:hover { background: rgba(255,255,255,.6); }
+    .concept-switcher button.active { color: #fff; background: #26332c; box-shadow: 0 1px 3px rgba(20,30,24,.18); }
+    .prototype-stage { padding: 16px; }
+    .prototype-frame {
+      position: relative;
+      width: min(1440px, 100%);
+      height: calc(100vh - 108px);
+      min-height: 620px;
+      margin: 0 auto;
+      overflow: hidden;
+      color: var(--on-surface);
+      background: var(--surface);
+      border: 1px solid var(--outline-variant);
+      border-radius: var(--frame-radius);
+      box-shadow: 0 8px 28px rgba(24, 35, 29, .12);
+    }
+    .theme-a {
+      --primary: #006c4c;
+      --on-primary: #ffffff;
+      --primary-container: #89f8c8;
+      --on-primary-container: #002116;
+      --secondary-container: #d0e8da;
+      --on-secondary-container: #0b2017;
+      --tertiary-container: #c8e7f5;
+      --on-tertiary-container: #061f29;
+      --surface: #f7fbf7;
+      --surface-container-low: #f1f5f1;
+      --surface-container: #ebf0ec;
+      --surface-container-high: #e5ebe6;
+      --on-surface: #191c1a;
+      --on-surface-variant: #414944;
+      --outline: #717973;
+      --outline-variant: #c1c9c3;
+      --error: #ba1a1a;
+      --focus: #006c4c;
+      --nav-width: 84px;
+      --frame-radius: 12px;
+      --card-radius: 12px;
+      --content-max: 1280px;
+    }
+    .theme-b {
+      --primary: #006a6a;
+      --on-primary: #ffffff;
+      --primary-container: #9cf1f0;
+      --on-primary-container: #002020;
+      --secondary-container: #cce8e7;
+      --on-secondary-container: #051f1f;
+      --tertiary-container: #ffddb3;
+      --on-tertiary-container: #2a1700;
+      --surface: #f5fafa;
+      --surface-container-low: #eff5f4;
+      --surface-container: #e7efee;
+      --surface-container-high: #dfe8e7;
+      --on-surface: #191c1c;
+      --on-surface-variant: #3f4948;
+      --outline: #6f7978;
+      --outline-variant: #bec9c7;
+      --error: #ba1a1a;
+      --focus: #006a6a;
+      --nav-width: 224px;
+      --frame-radius: 16px;
+      --card-radius: 16px;
+      --content-max: 1320px;
+    }
+    .theme-c {
+      --primary: #3d5f90;
+      --on-primary: #ffffff;
+      --primary-container: #d5e3ff;
+      --on-primary-container: #001b3d;
+      --secondary-container: #dae2f9;
+      --on-secondary-container: #131c2b;
+      --tertiary-container: #f8d8f9;
+      --on-tertiary-container: #27132b;
+      --surface: #f9f9ff;
+      --surface-container-low: #f1f2f8;
+      --surface-container: #eceef4;
+      --surface-container-high: #e4e6ec;
+      --on-surface: #1a1b20;
+      --on-surface-variant: #44474f;
+      --outline: #74777f;
+      --outline-variant: #c4c6d0;
+      --error: #ba1a1a;
+      --focus: #3d5f90;
+      --nav-width: 96px;
+      --frame-radius: 20px;
+      --card-radius: 20px;
+      --content-max: 1360px;
+    }
+    .window-bar {
+      position: absolute;
+      z-index: 20;
+      inset: 0 0 auto 0;
+      height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-left: 14px;
+      background: var(--surface-container-low);
+      border-bottom: 1px solid var(--outline-variant);
+    }
+    .window-brand { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 650; }
+    .window-brand img { width: 18px; height: 18px; border-radius: 5px; }
+    .window-brand span { color: var(--on-surface-variant); font-weight: 400; }
+    .window-actions { height: 100%; display: flex; }
+    .window-actions button { width: 42px; height: 100%; display: grid; place-items: center; padding: 0; border: 0; color: var(--on-surface-variant); background: transparent; }
+    .window-actions button:hover { background: var(--surface-container-high); }
+    .window-actions button:last-child:hover { color: #fff; background: var(--error); }
+    .nav-drawer {
+      position: absolute;
+      z-index: 10;
+      top: 38px;
+      bottom: 0;
+      left: 0;
+      width: var(--nav-width);
+      display: flex;
+      flex-direction: column;
+      padding: 16px 10px 12px;
+      background: var(--surface-container-low);
+      border-right: 1px solid var(--outline-variant);
+    }
+    .drawer-title { display: none; align-items: center; gap: 10px; min-height: 48px; padding: 0 12px 14px; }
+    .drawer-title img { width: 32px; height: 32px; border-radius: 9px; }
+    .drawer-title div { min-width: 0; }
+    .drawer-title b, .drawer-title span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .drawer-title b { font-size: 14px; }
+    .drawer-title span { margin-top: 2px; color: var(--on-surface-variant); font-size: 11px; }
+    .theme-b .drawer-title { display: flex; }
+    .nav-list { display: flex; flex: 1; flex-direction: column; gap: 4px; }
+    .nav-item {
+      position: relative;
+      min-height: 54px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 6px;
+      border: 0;
+      border-radius: 16px;
+      color: var(--on-surface-variant);
+      background: transparent;
+      transition: color 180ms ease, background 180ms ease;
+    }
+    .nav-item:hover { color: var(--on-surface); background: var(--surface-container); }
+    .nav-item.active { color: var(--on-secondary-container); background: var(--secondary-container); }
+    .nav-item span { font-size: 10px; font-weight: 600; }
+    .nav-item .badge { position: absolute; top: 5px; right: 9px; min-width: 17px; height: 17px; display: grid; place-items: center; padding: 0 4px; color: var(--on-primary); background: var(--primary); border-radius: 9px; font-size: 9px; }
+    .theme-b .nav-item { min-height: 48px; flex-direction: row; justify-content: flex-start; gap: 12px; padding: 0 16px; border-radius: 24px; }
+    .theme-b .nav-item span { font-size: 13px; }
+    .theme-b .nav-item .badge { position: static; margin-left: auto; }
+    .theme-c .nav-item { min-height: 60px; border-radius: 20px; }
+    .nav-footer { margin-top: auto; }
+    .workspace { position: absolute; inset: 38px 0 0 var(--nav-width); overflow: auto; background: var(--surface); scrollbar-color: var(--outline-variant) transparent; }
+    .top-app-bar {
+      position: sticky;
+      z-index: 8;
+      top: 0;
+      min-height: 70px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 12px 24px;
+      background: color-mix(in srgb, var(--surface) 94%, transparent);
+      border-bottom: 1px solid var(--outline-variant);
+    }
+    .top-app-bar h1 { margin: 0; font-size: 22px; line-height: 1.2; font-weight: 650; }
+    .top-app-bar p { margin: 3px 0 0; color: var(--on-surface-variant); font-size: 12px; }
+    .top-actions { display: flex; align-items: center; gap: 8px; }
+    .command-search { display: none; width: min(360px, 30vw); height: 46px; align-items: center; gap: 10px; padding: 0 16px; color: var(--on-surface-variant); background: var(--surface-container); border-radius: 24px; }
+    .command-search input { min-width: 0; flex: 1; border: 0; outline: 0; color: var(--on-surface); background: transparent; font-size: 12px; }
+    .theme-c .command-search { display: flex; }
+    .theme-c .top-app-bar { min-height: 80px; }
+    .content { width: min(var(--content-max), 100%); margin: 0 auto; padding: 22px 24px 30px; }
+    .surface { background: var(--surface-container-low); border: 1px solid var(--outline-variant); border-radius: var(--card-radius); }
+    .theme-b .surface { border-color: transparent; }
+    .theme-c .surface { border-color: transparent; }
+    .md-button { min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 18px; border-radius: 20px; border: 0; font-size: 12px; font-weight: 650; transition: background 180ms ease, box-shadow 180ms ease; }
+    .md-button.filled { color: var(--on-primary); background: var(--primary); }
+    .md-button.filled:hover { box-shadow: 0 2px 6px color-mix(in srgb, var(--primary) 30%, transparent); }
+    .md-button.tonal { color: var(--on-secondary-container); background: var(--secondary-container); }
+    .md-button.outlined { color: var(--primary); background: transparent; border: 1px solid var(--outline); }
+    .icon-button { width: 40px; height: 40px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; color: var(--on-surface-variant); background: transparent; }
+    .icon-button:hover { background: var(--surface-container-high); }
+    .status-pill { min-height: 34px; display: inline-flex; align-items: center; gap: 7px; padding: 0 12px; color: var(--on-secondary-container); background: var(--secondary-container); border-radius: 18px; font-size: 11px; font-weight: 650; white-space: nowrap; }
+    .status-pill::before { content: ''; width: 7px; height: 7px; background: var(--primary); border-radius: 50%; }
+    .switch { width: 44px; height: 24px; display: flex; align-items: center; padding: 2px; border: 2px solid var(--outline); border-radius: 14px; background: var(--surface-container-high); }
+    .switch::after { content: ''; width: 16px; height: 16px; background: var(--outline); border-radius: 50%; transition: transform 180ms ease, background 180ms ease; }
+    .switch.checked { border-color: var(--primary); background: var(--primary); }
+    .switch.checked::after { background: var(--on-primary); transform: translateX(20px); }
+    .summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
+    .stat { min-height: 108px; padding: 16px; background: var(--surface-container-low); border: 1px solid var(--outline-variant); border-radius: var(--card-radius); }
+    .stat-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--on-surface-variant); font-size: 11px; }
+    .stat-head svg { color: var(--primary); }
+    .stat strong { display: block; margin: 12px 0 4px; font-size: 23px; line-height: 1; }
+    .stat small { color: var(--on-surface-variant); font-size: 11px; }
+    .theme-b .summary-grid { grid-template-columns: 1.4fr 1fr 1fr; }
+    .theme-b .stat:first-child { color: var(--on-primary-container); background: var(--primary-container); border-color: transparent; }
+    .theme-b .stat:first-child .stat-head, .theme-b .stat:first-child small { color: color-mix(in srgb, var(--on-primary-container) 75%, transparent); }
+    .theme-c .summary-grid { grid-template-columns: 1.5fr 1fr 1fr; gap: 16px; }
+    .theme-c .stat { min-height: 128px; padding: 20px; }
+    .theme-c .stat:first-child { color: var(--on-primary-container); background: var(--primary-container); }
+    .theme-c .stat:nth-child(3) { color: var(--on-tertiary-container); background: var(--tertiary-container); }
+    .overview-grid { display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 12px; }
+    .theme-b .overview-grid { grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; }
+    .theme-c .overview-grid { grid-template-columns: minmax(0, 1.3fr) minmax(300px, .7fr); gap: 16px; }
+    .section-head { min-height: 54px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 16px; border-bottom: 1px solid var(--outline-variant); }
+    .section-head h2 { margin: 0; font-size: 14px; }
+    .section-head button { border: 0; color: var(--primary); background: transparent; font-size: 12px; font-weight: 650; }
+    .message-list { overflow: hidden; }
+    .message-row { min-height: 62px; display: grid; grid-template-columns: 38px minmax(0, 1fr) auto 18px; align-items: center; gap: 11px; padding: 8px 16px; border-bottom: 1px solid var(--outline-variant); }
+    .message-row:last-child { border-bottom: 0; }
+    .message-row:hover { background: var(--surface-container); }
+    .avatar { width: 36px; height: 36px; display: grid; place-items: center; color: var(--primary); background: var(--secondary-container); border-radius: 50%; font-size: 12px; font-weight: 700; }
+    .message-copy { min-width: 0; }
+    .message-copy b, .message-copy span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .message-copy b { margin-bottom: 3px; font-size: 12px; }
+    .message-copy span, .message-row time { color: var(--on-surface-variant); font-size: 11px; }
+    .unread-dot { width: 7px; height: 7px; background: var(--primary); border-radius: 50%; }
+    .runtime { padding: 16px; }
+    .runtime h2 { margin: 0 0 14px; font-size: 14px; }
+    .runtime dl { margin: 0 0 16px; }
+    .runtime dl div { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; font-size: 11px; }
+    .runtime dt { color: var(--on-surface-variant); }
+    .runtime dd { margin: 0; font-weight: 650; }
+    .progress-label { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 7px; color: var(--on-surface-variant); font-size: 10px; }
+    .progress { height: 6px; overflow: hidden; background: var(--surface-container-high); border-radius: 3px; }
+    .progress span { display: block; width: 72%; height: 100%; background: var(--primary); border-radius: inherit; }
+    .runtime .md-button { width: 100%; margin-top: 18px; }
+    .page-tools { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+    .search-bar { min-width: 260px; height: 46px; display: flex; align-items: center; gap: 10px; padding: 0 16px; color: var(--on-surface-variant); background: var(--surface-container); border-radius: 23px; }
+    .search-bar input { min-width: 0; flex: 1; border: 0; outline: 0; color: var(--on-surface); background: transparent; font-size: 12px; }
+    .chip { min-height: 34px; padding: 0 14px; color: var(--on-surface-variant); background: transparent; border: 1px solid var(--outline); border-radius: 9px; font-size: 11px; font-weight: 650; }
+    .chip.active { color: var(--on-secondary-container); background: var(--secondary-container); border-color: transparent; }
+    .page-tools .danger-action { margin-left: auto; color: var(--error); }
+    .history-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 12px; min-height: 430px; }
+    .history-row { min-height: 60px; display: grid; grid-template-columns: 36px 120px minmax(0,1fr) 52px; align-items: center; gap: 12px; padding: 8px 14px; border-bottom: 1px solid var(--outline-variant); }
+    .history-row.selected { background: var(--secondary-container); }
+    .history-row b, .history-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+    .history-row span { color: var(--on-surface-variant); }
+    .detail { padding: 18px; }
+    .detail-person { display: flex; align-items: center; gap: 12px; padding-bottom: 16px; border-bottom: 1px solid var(--outline-variant); }
+    .detail-person .avatar { width: 44px; height: 44px; }
+    .detail-person b, .detail-person span { display: block; }
+    .detail-person span { margin-top: 3px; color: var(--on-surface-variant); font-size: 11px; }
+    .detail dl { margin: 18px 0; }
+    .detail dt { margin-top: 12px; color: var(--on-surface-variant); font-size: 10px; }
+    .detail dd { margin: 4px 0 0; font-size: 12px; line-height: 1.55; }
+    .page-action-row { display: flex; justify-content: flex-end; margin-bottom: 12px; }
+    .rule-table { min-height: 440px; overflow: hidden; }
+    .table-row { min-height: 54px; display: grid; grid-template-columns: minmax(150px,1.4fr) 130px 110px 90px 48px; align-items: center; gap: 12px; padding: 0 18px; border-bottom: 1px solid var(--outline-variant); font-size: 11px; }
+    .table-row.header { min-height: 44px; color: var(--on-surface-variant); background: var(--surface-container); font-size: 10px; font-weight: 650; }
+    .table-row b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .table-row .switch { justify-self: start; }
+    .appearance-grid { display: grid; grid-template-columns: minmax(320px,.8fr) minmax(400px,1.2fr); gap: 14px; }
+    .settings-panel { padding: 18px; }
+    .setting-row { min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 14px; border-bottom: 1px solid var(--outline-variant); }
+    .setting-row:last-child { border-bottom: 0; }
+    .setting-row b, .setting-row span { display: block; }
+    .setting-row b { font-size: 12px; }
+    .setting-row span { margin-top: 3px; color: var(--on-surface-variant); font-size: 10px; }
+    .range-line { padding: 16px 0; border-bottom: 1px solid var(--outline-variant); }
+    .range-line label { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 12px; font-weight: 650; }
+    .range-line label span { color: var(--primary); }
+    input[type="range"] { width: 100%; accent-color: var(--primary); }
+    .position-picker { display: grid; grid-template-columns: repeat(3, 44px); gap: 6px; margin: 12px 0; }
+    .position-picker button { height: 34px; border: 1px solid var(--outline-variant); border-radius: 8px; background: var(--surface-container); }
+    .position-picker button.active { background: var(--primary-container); border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
+    .preview-panel { padding: 18px; }
+    .preview-panel h2 { margin: 0 0 14px; font-size: 14px; }
+    .preview-canvas { height: 246px; display: flex; align-items: flex-end; justify-content: flex-end; padding: 18px; background: var(--surface-container-high); border-radius: calc(var(--card-radius) - 4px); }
+    .notification { width: min(390px, 100%); min-height: 108px; padding: 16px; background: #fff; border: 1px solid var(--outline-variant); border-radius: 14px; box-shadow: 0 6px 18px rgba(22,38,30,.12); }
+    .notification-head { display: flex; align-items: center; gap: 10px; }
+    .notification-head > div:nth-child(2) { min-width: 0; flex: 1; }
+    .notification-head b, .notification-head span { display: block; }
+    .notification-head span { margin-top: 3px; color: #59635e; font-size: 11px; }
+    .notification time { color: #66716b; font-size: 10px; }
+    .settings-groups { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .settings-group { padding: 18px; }
+    .settings-group h2 { margin: 0 0 4px; font-size: 14px; }
+    .settings-group > p { margin: 0 0 8px; color: var(--on-surface-variant); font-size: 10px; }
+    .snackbar { position: absolute; z-index: 30; right: 22px; bottom: 18px; min-height: 46px; display: flex; align-items: center; gap: 10px; padding: 0 16px; color: #fff; background: #2d312f; border-radius: 6px; box-shadow: 0 6px 18px rgba(0,0,0,.2); font-size: 12px; opacity: 0; transform: translateY(8px); pointer-events: none; transition: opacity 180ms ease, transform 180ms ease; }
+    .snackbar.show { opacity: 1; transform: translateY(0); }
+    svg { flex: 0 0 auto; }
+    @media (max-width: 900px) {
+      .theme-b { --nav-width: 84px; }
+      .theme-b .drawer-title { display: none; }
+      .theme-b .nav-item { min-height: 54px; flex-direction: column; justify-content: center; gap: 4px; padding: 6px; border-radius: 16px; }
+      .theme-b .nav-item span { font-size: 10px; }
+      .theme-b .nav-item .badge { position: absolute; margin: 0; }
+      .summary-grid, .theme-b .summary-grid, .theme-c .summary-grid { grid-template-columns: 1fr 1fr; }
+      .summary-grid .stat:first-child { grid-column: 1 / -1; }
+      .overview-grid, .theme-b .overview-grid, .theme-c .overview-grid, .history-grid, .appearance-grid { grid-template-columns: 1fr; }
+      .settings-groups { grid-template-columns: 1fr; }
+      .command-search { display: none !important; }
+    }
+    @media (max-width: 700px) {
+      .prototype-bar { align-items: stretch; flex-direction: column; gap: 10px; padding: 12px 14px; }
+      .prototype-title span { display: none; }
+      .concept-switcher { width: 100%; grid-template-columns: repeat(3, 1fr); }
+      .concept-switcher button { min-width: 0; min-height: 38px; padding: 5px 8px; }
+      .prototype-stage { padding: 0; }
+      .prototype-frame { height: calc(100vh - 104px); min-height: 600px; border: 0; border-radius: 0; box-shadow: none; }
+      .window-brand span { display: none; }
+      .nav-drawer, .theme-b .nav-drawer {
+        position: fixed;
+        z-index: 40;
+        top: auto;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        height: 66px;
+        flex-direction: row;
+        padding: 5px 8px;
+        border-top: 1px solid var(--outline-variant);
+        border-right: 0;
+      }
+      .nav-list { flex-direction: row; justify-content: space-around; }
+      .nav-item, .theme-b .nav-item, .theme-c .nav-item { min-width: 52px; min-height: 54px; flex-direction: column; justify-content: center; gap: 3px; padding: 4px; border-radius: 16px; }
+      .nav-item span, .theme-b .nav-item span { font-size: 9px; }
+      .nav-item .badge, .theme-b .nav-item .badge { position: absolute; top: 2px; right: 3px; }
+      .nav-footer, .drawer-title { display: none !important; }
+      .workspace { inset: 38px 0 0 0; padding-bottom: 68px; }
+      .top-app-bar { position: relative; align-items: flex-start; min-height: 82px; padding: 14px 16px; }
+      .top-app-bar h1 { font-size: 19px; }
+      .top-app-bar p { max-width: 220px; }
+      .top-actions .status-pill { display: none; }
+      .content { padding: 14px 16px 24px; }
+      .summary-grid, .theme-b .summary-grid, .theme-c .summary-grid { grid-template-columns: 1fr; gap: 10px; }
+      .summary-grid .stat:first-child { grid-column: auto; }
+      .theme-c .stat { min-height: 108px; padding: 16px; }
+      .overview-grid { gap: 10px; }
+      .page-tools { flex-wrap: wrap; }
+      .search-bar { width: 100%; min-width: 0; }
+      .page-tools .danger-action { margin-left: 0; }
+      .history-row { grid-template-columns: 36px 86px minmax(0,1fr); }
+      .history-row time { display: none; }
+      .rule-table { overflow-x: auto; }
+      .table-row { min-width: 620px; }
+      .settings-groups { gap: 10px; }
+      .preview-canvas { height: 190px; padding: 12px; }
+      .snackbar { right: 12px; bottom: 78px; left: 12px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <header class="prototype-bar">
+    <div class="prototype-title"><strong>PingNest · Material Design 3 方案原型</strong><span id="conceptDescription">B 分层工作台：标准 MD3 容器层级与展开式导航</span></div>
+    <div class="concept-switcher" role="tablist" aria-label="选择设计方案">
+      <button type="button" data-concept="a" role="tab" aria-selected="false">A 静谧效率型</button>
+      <button type="button" data-concept="b" role="tab" aria-selected="true" class="active">B 分层工作台</button>
+      <button type="button" data-concept="c" role="tab" aria-selected="false">C Expressive</button>
+    </div>
+  </header>
+  <main class="prototype-stage"><div id="prototypeHost"></div></main>
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <script>
+    const concepts = {
+      a: { name: 'A 静谧效率型', description: 'A 静谧效率型：紧凑导航轨道、克制灰绿与高信息密度' },
+      b: { name: 'B 分层工作台', description: 'B 分层工作台：标准 MD3 容器层级与展开式导航' },
+      c: { name: 'C Expressive', description: 'C Expressive：更强状态色块、宽松节奏与现代控制中心' }
+    };
+    const pageMeta = {
+      overview: ['运行概览', '监控本地微信事件与桌面通知状态'],
+      history: ['通知历史', '搜索、筛选并处理本地通知记录'],
+      rules: ['静音规则', '管理不会触发桌面弹窗的消息条件'],
+      appearance: ['外观与弹窗', '调整桌面通知的位置与交互方式'],
+      settings: ['系统设置', '配置后台行为与本地数据保留策略']
+    };
+    const navItems = [
+      ['overview', 'layout-dashboard', '概览'], ['history', 'history', '历史'],
+      ['rules', 'volume-x', '静音'], ['appearance', 'palette', '外观'], ['settings', 'settings', '设置']
+    ];
+    let currentConcept = 'b';
+    let currentPage = 'overview';
+    let snackTimer;
+
+    function icon(name, size = 20) { return `<i data-lucide="${name}" style="width:${size}px;height:${size}px"></i>`; }
+    function switchControl(label, checked = true) { return `<button type="button" class="switch${checked ? ' checked' : ''}" role="switch" aria-checked="${checked}" aria-label="${label}"></button>`; }
+    function messages() {
+      return [
+        ['姜', '姜北尘', '今晚 8 点前把方案发我，我们需要做最后评审。', '08:57', true],
+        ['产', '产品群', '会议改到下周三下午两点，地点在多功能会议室。', '08:41', true],
+        ['设', '设计评审群', 'UI 走查完成，交互状态需要再统一一次。', '08:22', false],
+        ['王', '老王', '项目进度有更新，记得查看最新提交的文档。', '06:05', false]
+      ];
+    }
+    function messageRows() {
+      return messages().map(([avatar, name, text, time, unread]) => `<div class="message-row"><span class="avatar">${avatar}</span><span class="message-copy"><b>${name}</b><span>${text}</span></span><time>${time}</time>${unread ? '<i class="unread-dot" aria-label="未读"></i>' : '<span></span>'}</div>`).join('');
+    }
+    function overviewPage() {
+      return `<div class="summary-grid">
+        <section class="stat"><div class="stat-head"><span>监听状态</span>${icon('radio-tower',18)}</div><strong>运行中</strong><small>WeChat.exe 已连接</small></section>
+        <section class="stat"><div class="stat-head"><span>今日通知</span>${icon('bell-ring',18)}</div><strong>24</strong><small>较昨日增加 6 条</small></section>
+        <section class="stat"><div class="stat-head"><span>静音规则</span>${icon('shield-check',18)}</div><strong>3 条</strong><small>今日已命中 8 次</small></section>
+      </div><div class="overview-grid">
+        <section class="surface"><div class="section-head"><h2>最近捕获的微信通知</h2><button type="button" data-go="history">查看全部</button></div><div class="message-list">${messageRows()}</div></section>
+        <aside class="surface runtime"><h2>监控运行状态</h2><dl><div><dt>数据库连接</dt><dd>正常</dd></div><div><dt>连接账号</dt><dd>wxid_jiang</dd></div><div><dt>自动重连</dt><dd>已开启</dd></div><div><dt>记录估算大小</dt><dd>128 KB</dd></div></dl><div class="progress-label"><span>今日记录占比</span><b>72%</b></div><div class="progress"><span></span></div><button class="md-button tonal" type="button" data-snack="状态检查完成">${icon('refresh-cw',16)}立即检查</button></aside>
+      </div>`;
+    }
+    function historyPage() {
+      const rows = messages().map(([avatar,name,text,time], index) => `<div class="history-row${index === 0 ? ' selected' : ''}"><span class="avatar">${avatar}</span><b>${name}</b><span>${text}</span><time>${time}</time></div>`).join('');
+      return `<div class="page-tools"><label class="search-bar">${icon('search',18)}<input aria-label="搜索历史通知" placeholder="搜索通知内容..." /></label><button class="chip active" type="button">全部</button><button class="chip" type="button">今天</button><button class="chip" type="button">群聊</button><button class="md-button outlined danger-action" type="button" data-snack="原型不会清除数据">${icon('trash-2',16)}清空</button></div>
+      <div class="history-grid"><section class="surface">${rows}</section><aside class="surface detail"><div class="detail-person"><span class="avatar">姜</span><div><b>姜北尘</b><span>微信号：wxid_jiang</span></div></div><dl><dt>发送时间</dt><dd>2026/08/25 08:57</dd><dt>消息类型</dt><dd>私聊消息</dd><dt>完整内容</dt><dd>今晚 8 点前把方案发我，我们需要做最后评审。</dd></dl><button class="md-button tonal" type="button" data-snack="摘要已复制">${icon('copy',16)}复制摘要</button></aside></div>`;
+    }
+    function rulesPage() {
+      return `<div class="page-action-row"><button class="md-button filled" type="button" data-snack="已打开规则编辑器">${icon('plus',17)}新增规则</button></div><section class="surface rule-table"><div class="table-row header"><span>规则名称</span><span>匹配方式</span><span>启用状态</span><span>命中次数</span><span></span></div><div class="table-row"><b>屏蔽促销广告</b><span>包含任一</span>${switchControl('屏蔽促销广告',true)}<span>6 次</span><button class="icon-button" aria-label="编辑规则">${icon('more-vertical',18)}</button></div><div class="table-row"><b>项目群夜间静音</b><span>精确组合</span>${switchControl('项目群夜间静音',true)}<span>2 次</span><button class="icon-button" aria-label="编辑规则">${icon('more-vertical',18)}</button></div><div class="table-row"><b>测试会话</b><span>包含任一</span>${switchControl('测试会话',false)}<span>0 次</span><button class="icon-button" aria-label="编辑规则">${icon('more-vertical',18)}</button></div></section>`;
+    }
+    function appearancePage() {
+      return `<div class="appearance-grid"><section class="surface settings-panel"><b>弹窗显示位置</b><div class="position-picker" role="group" aria-label="弹窗显示位置"><button aria-label="顶部居中"></button><button aria-label="屏幕右上角"></button><button aria-label="屏幕左上角"></button><button aria-label="屏幕左下角"></button><button class="active" aria-label="屏幕右下角"></button></div><div class="range-line"><label>显示持续时间 <span>5 秒</span></label><input type="range" min="3" max="15" value="5" /></div><div class="range-line"><label>悬浮窗透明度 <span>90%</span></label><input type="range" min="70" max="100" value="90" /></div><div class="setting-row"><div><b>多消息聚合显示</b><span>同一会话 3.5 秒内的消息合并</span></div>${switchControl('多消息聚合显示',true)}</div><div class="setting-row"><div><b>显示消息摘要</b><span>关闭后只显示联系人和时间</span></div>${switchControl('显示消息摘要',true)}</div></section><section class="surface preview-panel"><h2>实时弹窗效果预览</h2><div class="preview-canvas"><article class="notification"><div class="notification-head"><span class="avatar">姜</span><div><b>姜北尘</b><span>今晚 8 点前把方案发我，我们需要做最后评审。</span></div><time>08:57</time></div></article></div></section></div>`;
+    }
+    function settingsPage() {
+      return `<div class="settings-groups"><section class="surface settings-group"><h2>启动与系统托盘</h2><p>管理应用在 Windows 中的后台行为</p><div class="setting-row"><div><b>开机自动启动</b><span>登录 Windows 后自动运行</span></div>${switchControl('开机自动启动',false)}</div><div class="setting-row"><div><b>最小化到系统托盘</b><span>关闭窗口时保持后台监听</span></div>${switchControl('最小化到系统托盘',true)}</div></section><section class="surface settings-group"><h2>监听与连接</h2><p>配置检测频率与断线恢复</p><div class="range-line"><label>进程检测间隔 <span>3 秒</span></label><input type="range" min="1" max="15" value="3" /></div><div class="setting-row"><div><b>自动恢复连接</b><span>WCDB 管道关闭后尝试重新连接</span></div>${switchControl('自动恢复连接',true)}</div></section><section class="surface settings-group"><h2>历史消息</h2><p>控制本机通知数据的保留范围</p><div class="setting-row"><div><b>保留时长</b><span>自动保留最近 30 天</span></div><button class="md-button tonal" type="button">修改</button></div><div class="setting-row"><div><b>自动清理过期记录</b><span>启动和退出时执行</span></div>${switchControl('自动清理过期记录',true)}</div></section><section class="surface settings-group"><h2>数据与隐私</h2><p>所有记录仅保存在当前设备</p><div class="setting-row"><div><b>本地通知数据</b><span>当前保存 128 条记录</span></div>${icon('hard-drive',20)}</div><button class="md-button outlined" type="button" data-snack="原型不会清除数据">${icon('trash-2',16)}清空通知历史</button></section></div>`;
+    }
+    function renderPage() {
+      return ({ overview: overviewPage, history: historyPage, rules: rulesPage, appearance: appearancePage, settings: settingsPage })[currentPage]();
+    }
+    function render() {
+      const [title, subtitle] = pageMeta[currentPage];
+      const nav = navItems.map(([id, iconName, label]) => `<button type="button" class="nav-item${currentPage === id ? ' active' : ''}" data-page="${id}" aria-current="${currentPage === id ? 'page' : 'false'}">${icon(iconName,20)}<span>${label}</span>${id === 'history' ? '<i class="badge">2</i>' : ''}</button>`).join('');
+      document.getElementById('prototypeHost').innerHTML = `<section class="prototype-frame theme-${currentConcept}" aria-label="${concepts[currentConcept].name}原型"><header class="window-bar"><div class="window-brand"><img src="/icon.png" alt="" /><b>PingNest</b><span>微信通知伴侣</span></div><div class="window-actions"><button aria-label="最小化">${icon('minus',14)}</button><button aria-label="最大化">${icon('square',12)}</button><button aria-label="关闭">${icon('x',14)}</button></div></header><aside class="nav-drawer"><div class="drawer-title"><img src="/icon.png" alt="" /><div><b>通知伴侣</b><span>本地运行中</span></div></div><nav class="nav-list" aria-label="主导航">${nav}</nav><button class="nav-item nav-footer" type="button" data-snack="帮助中心暂未接入">${icon('circle-help',20)}<span>帮助</span></button></aside><main class="workspace"><header class="top-app-bar"><div><h1>${title}</h1><p>${subtitle}</p></div><div class="top-actions"><label class="command-search">${icon('search',18)}<input aria-label="全局搜索" placeholder="搜索通知、规则或设置" /></label><span class="status-pill">服务运行中</span>${switchControl('桌面通知总开关',true)}<button class="icon-button" aria-label="更多操作">${icon('more-vertical',20)}</button></div></header><div class="content">${renderPage()}</div></main><div class="snackbar" role="status">${icon('check-circle-2',18)}<span></span></div></section>`;
+      document.getElementById('conceptDescription').textContent = concepts[currentConcept].description;
+      bindInteractions();
+      if (window.lucide) window.lucide.createIcons();
+    }
+    function showSnack(message) {
+      const snack = document.querySelector('.snackbar');
+      if (!snack) return;
+      snack.querySelector('span').textContent = message;
+      snack.classList.add('show');
+      clearTimeout(snackTimer);
+      snackTimer = setTimeout(() => snack.classList.remove('show'), 1600);
+    }
+    function bindInteractions() {
+      document.querySelectorAll('[data-page]').forEach(button => button.addEventListener('click', () => { currentPage = button.dataset.page; render(); }));
+      document.querySelectorAll('[data-go]').forEach(button => button.addEventListener('click', () => { currentPage = button.dataset.go; render(); }));
+      document.querySelectorAll('[data-snack]').forEach(button => button.addEventListener('click', () => showSnack(button.dataset.snack)));
+      document.querySelectorAll('.switch').forEach(button => button.addEventListener('click', () => { const checked = button.classList.toggle('checked'); button.setAttribute('aria-checked', String(checked)); }));
+      document.querySelectorAll('.chip').forEach(button => button.addEventListener('click', () => { button.parentElement.querySelectorAll('.chip').forEach(chip => chip.classList.remove('active')); button.classList.add('active'); }));
+      document.querySelectorAll('.position-picker button').forEach(button => button.addEventListener('click', () => { button.parentElement.querySelectorAll('button').forEach(item => item.classList.remove('active')); button.classList.add('active'); }));
+    }
+    document.querySelectorAll('[data-concept]').forEach(button => button.addEventListener('click', () => {
+      currentConcept = button.dataset.concept;
+      document.querySelectorAll('[data-concept]').forEach(item => { const active = item === button; item.classList.toggle('active', active); item.setAttribute('aria-selected', String(active)); });
+      render();
+    }));
+    render();
+  </script>
+</body>
+</html>

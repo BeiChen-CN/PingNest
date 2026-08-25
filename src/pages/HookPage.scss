@@ -1,0 +1,80 @@
+@use '../styles/tokens' as *;
+@use '../styles/motion' as *;
+
+.hook-shell {
+  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
+  color: $text;
+  background: $bg;
+  font: 13px "Segoe UI Variable", "Segoe UI", "Microsoft YaHei UI", sans-serif;
+  letter-spacing: 0;
+
+  * { box-sizing: border-box; letter-spacing: 0; }
+  button { font: inherit; cursor: pointer; }
+  button:disabled { cursor: not-allowed; }
+  button:focus-visible { outline: 2px solid rgba($green, .52); outline-offset: 2px; }
+}
+
+.hook-titlebar {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 10;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 12px;
+  background: $surface;
+  border-bottom: 1px solid $border;
+  -webkit-app-region: drag;
+}
+
+.hook-brand { display: flex; align-items: center; gap: 6px; img { width: 17px; height: 17px; border-radius: 4px; } b { font-size: 12px; font-weight: 650; } }
+.hook-window-actions { height: 100%; display: flex; -webkit-app-region: no-drag; button { width: 44px; height: 100%; display: grid; place-items: center; padding: 0; color: $muted; background: transparent; border: 0; transition: color 160ms ease, background 160ms ease; &:hover { color: $text; background: #edf1ef; } &.close:hover { color: #fff; background: $danger; } } }
+
+.hook-main {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 72px 24px 28px;
+}
+
+.hook-intro { width: min(100%, 430px); margin-bottom: 18px; text-align: center; }
+.hook-mark { width: 52px; height: 52px; display: grid; place-items: center; margin: 0 auto 13px; color: #137746; background: $green-soft; border: 1px solid #c9e7d7; border-radius: 8px; }
+.hook-eyebrow { display: block; margin-bottom: 5px; color: $green; font-size: 12px; font-weight: 650; }
+.hook-intro h1 { margin: 0; font-size: 24px; line-height: 1.25; font-weight: 650; }
+.hook-intro p { margin: 7px 0 0; color: $muted; font-size: 13px; }
+
+.hook-panel { width: min(100%, 430px); padding: 18px; background: $surface; border: 1px solid $border; border-radius: 8px; box-shadow: 0 12px 34px rgba(25, 48, 36, .08); }
+.hook-panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding-bottom: 15px; border-bottom: 1px solid $border; > div { min-width: 0; } b, span { display: block; } b { margin-bottom: 4px; font-size: 13px; } > div > span { color: $muted; font-size: 12px; } }
+.wechat-state { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px; color: #6a746f; background: #f0f3f1; border-radius: 12px; font-size: 11px; white-space: nowrap; i { width: 6px; height: 6px; border-radius: 50%; background: #9aa6a0; } &.ready { color: #176c43; background: $green-soft; i { background: $green; box-shadow: 0 0 0 3px rgba($green, .1); } } }
+
+.hook-steps { margin: 0; padding: 8px 0; list-style: none; }
+.hook-steps li { min-height: 54px; display: grid; grid-template-columns: 32px minmax(0, 1fr); align-items: center; gap: 10px; position: relative; &::after { content: ''; position: absolute; top: 43px; bottom: -11px; left: 15px; width: 1px; background: #dfe7e2; } &:last-child::after { display: none; } > span:last-child { min-width: 0; } b, small { display: block; } b { margin-bottom: 3px; font-size: 12px; } small { overflow: hidden; color: $muted; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; } &.active .step-icon { color: $green; background: $green-soft; border-color: #b9ddca; } &.done .step-icon { color: #fff; background: $green; border-color: $green; } &.done::after { background: #9fd1b6; } }
+.step-icon { position: relative; z-index: 1; width: 32px; height: 32px; display: grid; place-items: center; color: #7b8780; background: $surface; border: 1px solid #d9e1dd; border-radius: 50%; }
+
+.hook-feedback { min-height: 38px; display: flex; align-items: center; gap: 8px; margin: 4px 0 12px; padding: 8px 10px; border: 1px solid; border-radius: 6px; font-size: 12px; line-height: 1.45; &.error { color: #8f2f2b; background: #fff3f2; border-color: #efcfcc; } &.success { color: #176c43; background: #eff9f3; border-color: #c5e5d3; } svg { flex: 0 0 auto; } }
+.hook-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 13px; border-top: 1px solid $border; }
+.hook-primary, .hook-secondary { min-height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 7px 14px; border-radius: 6px; font-size: 12px; transition: color 160ms ease, background 160ms ease, border-color 160ms ease; }
+.hook-primary { color: #fff; background: $green; border: 1px solid $green; &:hover:not(:disabled) { background: #188e55; } &:disabled { opacity: .45; } }
+.hook-secondary { color: $text; background: $surface; border: 1px solid $border; &:hover:not(:disabled) { background: $green-hover; border-color: #c8ded2; } }
+.hook-privacy { display: flex; align-items: center; gap: 5px; margin: 14px 0 0; color: $muted; font-size: 11px; }
+
+.hook-shell .spin { animation: motion-spin 700ms linear infinite; }
+
+@media (max-width: 520px) {
+  .hook-main { justify-content: flex-start; padding: 78px 16px 24px; }
+  .hook-intro { margin-bottom: 15px; }
+  .hook-panel { padding: 15px; }
+  .hook-panel-head { align-items: stretch; flex-direction: column; gap: 10px; }
+  .wechat-state { align-self: flex-start; }
+  .hook-actions { flex-direction: column-reverse; }
+  .hook-primary, .hook-secondary { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hook-shell *, .hook-shell *::before, .hook-shell *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}

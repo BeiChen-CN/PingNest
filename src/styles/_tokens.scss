@@ -1,0 +1,29 @@
+// PingNest 设计 token（对应 Figma 规范与 WPF-UI-SPEC）
+// 主色系统
+$app-bg: #F6F8F7;          // 应用背景
+$surface: #FFFFFF;         // 主内容背景
+$select-green: #E8F7EE;    // 淡绿选中背景
+$hover-green: #F0FAF4;     // 淡绿悬停背景
+$green: #20A866;           // 主操作绿
+$text: #18211D;            // 深色正文
+$muted: #66736C;           // 次级文字
+$border: #E3EAE6;          // 弱边框
+$warn: #D98B27;            // 警告色
+$danger: #D9534F;          // 错误色
+
+// 兼容旧变量名
+$bg: $app-bg;
+$green-soft: $select-green;
+$green-hover: $hover-green;
+
+// 衍生色（局部实现，基于主色微调）
+$green-deep: #188E55;        // 主绿按下态
+$green-deepest: #15804D;     // 头像/强调文字深绿
+$green-text: #167A4A;        // 成功/数值强调文字
+$surface-hover: #EDF1EF;     // 中性表面悬停
+$neutral-fill: #EEF3F0;      // 弱填充（日志、辅助按钮底）
+$neutral-track: #DCE5E0;     // 滑轨、滚动条
+$text-faint: #849089;        // 弱时间戳文字
+$dot-off: #AAB4AF;           // 状态点（关闭态）
+$error-soft-bg: #FFF3F2;     // 错误弱背景
+$error-border: #EFCFCC;      // 错误弱边框

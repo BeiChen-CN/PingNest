@@ -1,0 +1,31 @@
+@use '../styles/motion' as *;
+
+@keyframes notification-exit {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-4px); }
+}
+
+body {
+  background: transparent;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+}
+
+#notification-current {
+  animation: motion-fade-down $motion-duration-slow $motion-ease-out both;
+  will-change: transform, opacity;
+}
+
+#notification-prev {
+  animation: notification-exit $motion-duration-base $motion-ease-in both;
+  transform-origin: center top;
+  will-change: transform, opacity;
+  z-index: 0 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #notification-current, #notification-prev {
+    animation-duration: .01ms;
+  }
+}

@@ -1,0 +1,42 @@
+@use '../../../styles/tokens' as *;
+@use '../../../styles/motion' as *;
+
+.toast-host {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 220px;
+  max-width: 340px;
+  padding: 9px 10px 9px 12px;
+  color: $text;
+  background: $surface;
+  border: 1px solid $border;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(21, 45, 32, 0.08);
+  font-size: 12px;
+  line-height: 1.4;
+  pointer-events: auto;
+  animation: motion-fade-up $motion-duration-base $motion-ease-out both;
+
+  &.success svg { color: $green; }
+  &.error svg { color: $danger; }
+  &.info svg { color: $muted; }
+
+  span { flex: 1; min-width: 0; }
+  .icon-button { flex: 0 0 auto; width: 20px; height: 20px; border: 0; border-radius: 4px; display: grid; place-items: center; color: $muted; background: transparent; cursor: pointer; &:hover { background: $surface-hover; color: $text; } }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast-item { animation: none; }
+}
