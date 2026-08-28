@@ -235,17 +235,8 @@ export function useDashboardData(onNavigateToSession: (sessionId: string, entrie
     applyEntries(previous.map((entry) => entry.payload.sessionId === sessionId ? { ...entry, read: true } : entry))
     try {
       if (!window.electronAPI) return
-      try {
-        const markSessionRead = window.electronAPI.notifyCenter.markSessionRead
-        if (typeof markSessionRead !== 'function') throw new Error('No handler registered for notify:markSessionRead')
-        const result = await markSessionRead(sessionId)
-        if (result && !result.success) throw new Error('会话已读状态未保存')
-      } catch (error) {
-        // 兼容已经启动的旧主进程：逐条标记，不让历史页因 IPC 版本不一致报错。
-        if (!String(error).includes('No handler registered')) throw error
-        const unreadIds = previous.filter((entry) => entry.payload.sessionId === sessionId && !entry.read).map((entry) => entry.id)
-        await Promise.all(unreadIds.map((id) => window.electronAPI!.notifyCenter.markRead(id)))
-      }
+      const result = await window.electronAPI.notifyCenter.markSessionRead(sessionId)
+      if (result && !result.success) throw new Error('会话已读状态未保存')
     } catch (error) {
       applyEntries(previous)
       setErrorMessage(`更新会话状态失败：${String(error)}`)

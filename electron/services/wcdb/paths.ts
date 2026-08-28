@@ -46,12 +46,15 @@ export function getWcdbDllPath(resourcesPath: string | null): string {
   return candidatesFallback(roots, relativeCandidates, libName)
 }
 
+/**
+ * 兜底路径：所有候选都不存在时，返回首选候选（让 koffi.load 报出完整路径，
+ * 便于诊断），完全没有根目录时退回裸库名。
+ * 历史遗留：这里曾是嵌套循环但首轮即 return，行为与"取第一个候选"一致。
+ */
 function candidatesFallback(roots: string[], relativeCandidates: string[], libName: string): string {
-  for (const root of roots) {
-    for (const relativePath of relativeCandidates) {
-      return join(root, relativePath)
-    }
-  }
+  const root = roots[0]
+  const relativePath = relativeCandidates[0]
+  if (root && relativePath) return join(root, relativePath)
   return libName
 }
 
