@@ -12,7 +12,7 @@ export function AboutPage({ config, status, entryCount }: Props) {
     <div className="about-hero surface">
       <div className="about-brand-mark"><BellRing size={25} /></div>
       <div className="about-hero-copy"><span className="about-eyebrow">本地通知伴侣</span><h2>PingNest</h2><p>把重要的微信消息，安静而可靠地带到桌面。</p></div>
-      <span className="about-version">v0.1.0</span>
+      <span className="about-version">v{__APP_VERSION__}</span>
     </div>
 
     <div className="about-grid">

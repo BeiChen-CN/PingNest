@@ -1,6 +1,6 @@
 {
   "name": "pingnest",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "PingNest",
   "main": "dist-electron/main.js",
   "engines": {
@@ -15,7 +15,8 @@
     "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/message-baseline.test.mjs tests/notification-layout.test.mjs tests/display-name.test.mjs tests/history-grouping.test.mjs tests/sql-message-content.test.mjs tests/message-revoke.test.mjs tests/message-dedupe.test.mjs tests/sql-builder.test.mjs",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
     "build": "tsc && vite build && electron-builder",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "icon": "node scripts/generate-icon.cjs"
   },
   "dependencies": {
     "electron-store": "^11.0.2",
@@ -34,6 +35,8 @@
     "7zip-bin": "^5.2.0",
     "electron": "^41.1.1",
     "electron-builder": "^26.8.1",
+    "jimp": "^0.22.12",
+    "png-to-ico": "^2.1.8",
     "sass": "^1.98.0",
     "typescript": "^6.0.2",
     "vite": "^7.0.0",
