@@ -1,9 +1,6 @@
 import { useCallback, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import {
-  AlertTriangle, History, Info, LayoutDashboard, Maximize2, Minus,
-  Paintbrush, Settings, VolumeX, X
-} from 'lucide-react'
+import { AlertTriangle, History, Info, LayoutDashboard, Paintbrush, Settings, VolumeX, X } from 'lucide-react'
 import { ConfirmDialog } from '../features/dashboard/components/ConfirmDialog'
 import { useDashboardData } from '../features/dashboard/hooks/useDashboardData'
 import { AppearancePage } from '../features/dashboard/pages/AppearancePage'
@@ -12,9 +9,10 @@ import { OverviewPage } from '../features/dashboard/pages/OverviewPage'
 import { RulesPage } from '../features/dashboard/pages/RulesPage'
 import { SystemSettingsPage } from '../features/dashboard/pages/SystemSettingsPage'
 import { AboutPage } from '../features/dashboard/pages/AboutPage'
+import { Titlebar } from '../components/Titlebar'
 import { PAGE_PATHS, type NotifyCenterEntry, type PageId } from '../features/dashboard/types'
 import { ToastHost } from '../features/dashboard/components/Toast'
-import './SettingsPage.scss'
+import './AppShell.scss'
 
 const NAV_ITEMS: Array<{ id: PageId; label: string; icon: typeof LayoutDashboard }> = [
   { id: 'overview', label: '概览', icon: LayoutDashboard },
@@ -36,7 +34,7 @@ const PAGE_META: Record<PageId, { title: string }> = {
 
 const PATH_PAGES = Object.fromEntries(Object.entries(PAGE_PATHS).map(([page, path]) => [path, page])) as Record<string, PageId>
 
-export default function SettingsPage() {
+export default function AppShell() {
   const location = useLocation()
   const navigate = useNavigate()
   const page = PATH_PAGES[location.pathname] || 'overview'
@@ -92,7 +90,7 @@ export default function SettingsPage() {
   if (!config || !status) return <div className="page-loading">正在准备应用...</div>
 
   return <div className="app-shell">
-    <header className="titlebar"><div className="brand"><img src="./icon.png" alt="" /><b>PingNest</b></div><div className="window-actions"><button onClick={() => window.electronAPI?.app.minimize()} aria-label="最小化" title="最小化"><Minus size={14} /></button><button onClick={() => window.electronAPI?.app.toggleMaximize()} aria-label="最大化或还原" title="最大化或还原"><Maximize2 size={13} /></button><button className="close" onClick={() => window.electronAPI?.app.closeWindow()} aria-label={config.closeToTray ? '隐藏到系统托盘' : '退出应用'} title={config.closeToTray ? '隐藏到系统托盘' : '退出应用'}><X size={14} /></button></div></header>
+    <Titlebar variant="app" closeLabel={config.closeToTray ? '隐藏到系统托盘' : '退出应用'} />
     <aside className="sidebar"><nav aria-label="主导航">{NAV_ITEMS.map((item) => { const Icon = item.icon; return <button key={item.id} className={page === item.id ? 'active' : ''} aria-current={page === item.id ? 'page' : undefined} onClick={() => navigate(PAGE_PATHS[item.id])} title={item.label}><Icon size={18} /><span>{item.label}</span>{item.id === 'history' && unreadCount > 0 && <i>{Math.min(unreadCount, 99)}</i>}</button> })}</nav></aside>
     <main className="workspace" key={page}>
       {errorMessage && <div className="error-banner" role="alert"><AlertTriangle size={15} /><span>{errorMessage}</span><button className="icon-button" onClick={() => dashboard.setErrorMessage('')} aria-label="关闭错误提示" title="关闭"><X size={14} /></button></div>}

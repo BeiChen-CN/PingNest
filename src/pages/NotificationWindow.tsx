@@ -26,6 +26,8 @@ interface RawNotificationData {
 
 const NOTIFICATION_EXIT_MS = 260
 
+type TimerKind = 'close' | 'hide' | 'click'
+
 /**
  * 通知弹窗窗口：
  * - 支持同会话合并（mergeWindowMs 内连发折叠为一张卡片 + 计数）
@@ -33,90 +35,92 @@ const NOTIFICATION_EXIT_MS = 260
  * - 旧卡片淡出动画
  * - 测量内容高度并通过 IPC 调整窗口尺寸
  */
+
+/** 同会话合并窗口内的消息折叠进当前卡片；不在窗口内返回 null（开新卡）。 */
+export function mergeNotification(
+  current: NotificationData,
+  data: RawNotificationData,
+  mergeWindowMs: number,
+  nowMs: number
+): NotificationData | null {
+  if (current.sessionId !== data.sessionId) return null
+  const elapsedMs = nowMs - (current.receivedAtMs || current.timestamp * 1000)
+  if (elapsedMs >= mergeWindowMs) return null
+  return {
+    ...current,
+    content: data.content ?? current.content,
+    timestamp: Math.floor(nowMs / 1000),
+    receivedAtMs: nowMs,
+    mergeCount: (current.mergeCount || 1) + 1,
+    opacity: data.opacity,
+    showSummary: data.showSummary,
+    clickBehavior: data.clickBehavior,
+    soundEnabled: data.soundEnabled,
+    sound: data.sound,
+    notificationStyle: data.notificationStyle
+  }
+}
+
 export default function NotificationWindow() {
   const [notification, setNotification] = useState<NotificationData | null>(null)
   const [prevNotification, setPrevNotification] = useState<NotificationData | null>(null)
   const [position, setPosition] = useState('top-right')
   const notificationRef = useRef<NotificationData | null>(null)
-  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const timersRef = useRef<Record<TimerKind, ReturnType<typeof setTimeout> | null>>({ close: null, hide: null, click: null })
   const mergeWindowMsRef = useRef(3500)
 
   useEffect(() => {
     notificationRef.current = notification
   }, [notification])
 
-  const clearCloseTimer = () => {
-    if (closeTimerRef.current) {
-      clearTimeout(closeTimerRef.current)
-      closeTimerRef.current = null
+  const clearTimer = (kind: TimerKind) => {
+    if (timersRef.current[kind]) {
+      clearTimeout(timersRef.current[kind])
+      timersRef.current[kind] = null
     }
   }
 
-  const clearHideTimer = () => {
-    if (hideTimerRef.current) {
-      clearTimeout(hideTimerRef.current)
-      hideTimerRef.current = null
-    }
+  const clearAllTimers = () => {
+    for (const kind of ['close', 'hide', 'click'] as TimerKind[]) clearTimer(kind)
   }
 
-  const clearClickTimer = () => {
-    if (clickTimerRef.current) {
-      clearTimeout(clickTimerRef.current)
-      clickTimerRef.current = null
-    }
+  const setTimer = (kind: TimerKind, fn: () => void, delayMs: number) => {
+    clearTimer(kind)
+    timersRef.current[kind] = setTimeout(() => {
+      timersRef.current[kind] = null
+      fn()
+    }, delayMs)
   }
 
-  const dismissWithAnimation = () => {
-    clearCloseTimer()
-    clearHideTimer()
-    clearClickTimer()
+  /** 当前卡片播放退场动画后关闭窗口 */
+  const dismissWithAnimation = (onExited: () => void) => {
+    clearAllTimers()
     const current = notificationRef.current
     if (current) setPrevNotification(current)
     notificationRef.current = null
     setNotification(null)
     const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
-    hideTimerRef.current = setTimeout(() => {
-      hideTimerRef.current = null
-      setPrevNotification(null)
-      void window.electronAPI?.notification?.close()
-    }, reduceMotion ? 0 : NOTIFICATION_EXIT_MS)
+    setTimer('hide', onExited, reduceMotion ? 0 : NOTIFICATION_EXIT_MS)
   }
 
   const scheduleClose = (durationMs: number) => {
-    clearCloseTimer()
-    closeTimerRef.current = setTimeout(dismissWithAnimation, durationMs)
+    setTimer('close', () => dismissWithAnimation(closeWindow), durationMs)
   }
 
   const handleShow = (data: RawNotificationData) => {
     const nowMs = Date.now()
-    const nowSeconds = Math.floor(nowMs / 1000)
     const durationMs = data.durationMs || 5000
     mergeWindowMsRef.current = Math.max(0, Number(data.mergeWindowMs ?? 3500))
-    clearHideTimer()
-    clearClickTimer()
+    clearTimer('hide')
+    clearTimer('click')
 
     if (data.position) setPosition(data.position)
 
     // 同会话合并：当前卡片还在显示且时间在合并窗口内
     const current = notificationRef.current
-    if (current && current.sessionId === data.sessionId) {
-      const elapsedMs = nowMs - (current.receivedAtMs || current.timestamp * 1000)
-      if (elapsedMs < mergeWindowMsRef.current) {
-        const merged: NotificationData = {
-          ...current,
-          content: data.content ?? current.content,
-          timestamp: nowSeconds,
-          receivedAtMs: nowMs,
-          mergeCount: (current.mergeCount || 1) + 1,
-          opacity: data.opacity,
-          showSummary: data.showSummary,
-          clickBehavior: data.clickBehavior,
-          soundEnabled: data.soundEnabled,
-          sound: data.sound,
-          notificationStyle: data.notificationStyle
-        }
+    if (current) {
+      const merged = mergeNotification(current, data, mergeWindowMsRef.current, nowMs)
+      if (merged) {
         notificationRef.current = merged
         setNotification(merged)
         scheduleClose(durationMs)
@@ -130,7 +134,7 @@ export default function NotificationWindow() {
       sessionType: data.sessionType,
       title: data.title,
       content: data.content,
-      timestamp: nowSeconds,
+      timestamp: Math.floor(nowMs / 1000),
       avatarUrl: data.avatarUrl,
       event: data.event,
       position: data.position,
@@ -159,9 +163,7 @@ export default function NotificationWindow() {
     window.electronAPI?.notification?.ready?.()
     return () => {
       remove?.()
-      clearCloseTimer()
-      clearHideTimer()
-      clearClickTimer()
+      clearAllTimers()
     }
   }, [])
 
@@ -174,24 +176,16 @@ export default function NotificationWindow() {
   }, [prevNotification])
 
   const handleClose = () => {
-    dismissWithAnimation()
+    dismissWithAnimation(closeWindow)
   }
 
   const handleClick = (sessionId: string) => {
     if (notificationRef.current?.clickBehavior === 'none') return
-    clearCloseTimer()
-    clearHideTimer()
-    clearClickTimer()
     const current = notificationRef.current
     if (!current) return
-    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
-    setPrevNotification(current)
-    notificationRef.current = null
-    setNotification(null)
-    clickTimerRef.current = setTimeout(() => {
-      clickTimerRef.current = null
+    dismissWithAnimation(() => {
       window.electronAPI?.notification?.click(sessionId)
-    }, reduceMotion ? 0 : NOTIFICATION_EXIT_MS)
+    })
   }
 
   // 测量并上报尺寸
@@ -274,4 +268,8 @@ export default function NotificationWindow() {
       )}
     </div>
   )
+}
+
+function closeWindow(): void {
+  void window.electronAPI?.notification?.close()
 }

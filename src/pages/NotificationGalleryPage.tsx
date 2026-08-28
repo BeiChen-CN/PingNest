@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { AppearancePage } from '../features/dashboard/pages/AppearancePage'
 import { DEFAULT_CONFIG, type AppConfig, type SaveConfig } from '../features/dashboard/types'
-import './SettingsPage.scss'
+import './AppShell.scss'
 
 export default function NotificationGalleryPage() {
   const [config, setConfig] = useState<AppConfig>(DEFAULT_CONFIG)

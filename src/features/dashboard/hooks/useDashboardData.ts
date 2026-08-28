@@ -127,72 +127,84 @@ export function useDashboardData(onNavigateToSession: (sessionId: string, entrie
     }
   }
 
-  const reconnect = async () => {
-    if (!window.electronAPI) return false
-    setBusy(true)
+  /**
+   * 通用操作流程：占用 busy → 执行 → 成功/失败提示 → 释放 busy（可选刷新）。
+   * run() 抛出的 Error.message 直接面向用户展示。
+   */
+  const performAction = useCallback(async (options: {
+    run: () => Promise<void>
+    setBusy?: (busy: boolean) => void
+    refreshAfter?: boolean
+    successToast?: string
+    errorPrefix?: string
+    onSuccess?: () => void
+    onError?: (message: string) => void
+  }): Promise<boolean> => {
+    options.setBusy?.(true)
     try {
+      await options.run()
+      options.onSuccess?.()
+      if (options.successToast) toast(options.successToast, 'success')
+      setErrorMessage('')
+      return true
+    } catch (error) {
+      const raw = error instanceof Error ? error.message : String(error)
+      const message = (options.errorPrefix || '') + raw
+      setErrorMessage(message)
+      toast(message, 'error')
+      options.onError?.(message)
+      return false
+    } finally {
+      options.setBusy?.(false)
+      if (options.refreshAfter) void refresh()
+    }
+  }, [refresh])
+
+  const reconnect = (): Promise<boolean> => performAction({
+    setBusy: setBusy,
+    refreshAfter: true,
+    successToast: '已恢复微信消息监听',
+    errorPrefix: '重新连接失败：',
+    run: async () => {
+      if (!window.electronAPI) return
       const result = await window.electronAPI.app.reconnect()
       if (!result.success) throw new Error(result.error || '重新连接失败')
-      toast('已恢复微信消息监听', 'success')
-      setErrorMessage('')
-      return true
-    } catch (error) {
-      const message = '重新连接失败：' + String(error)
-      setErrorMessage(message)
-      toast(message, 'error')
-      return false
-    } finally {
-      setBusy(false)
-      void refresh()
     }
-  }
+  })
 
-  const rehook = async (): Promise<boolean> => {
-    if (hookBusy) return false
-    setHookBusy(true)
+  const rehook = (): Promise<boolean> => {
+    if (hookBusy) return Promise.resolve(false)
     setHookProgress({ stage: 'detecting', message: '正在查找微信账号' })
-    try {
-      if (!window.electronAPI) {
+    return performAction({
+      setBusy: setHookBusy,
+      refreshAfter: true,
+      successToast: '微信连接已更新，消息监听已恢复',
+      run: async () => {
+        if (!window.electronAPI) {
+          setHookProgress({ stage: 'success', message: '微信连接成功' })
+          return
+        }
+        const result = await window.electronAPI.app.hook()
+        if (!result.success) throw new Error(result.error || '重新连接失败')
         setHookProgress({ stage: 'success', message: '微信连接成功' })
-        toast('微信连接已更新', 'success')
-        return true
-      }
-      const result = await window.electronAPI.app.hook()
-      if (!result.success) throw new Error(result.error || '重新连接失败')
-      setHookProgress({ stage: 'success', message: '微信连接成功' })
-      toast('微信连接已更新，消息监听已恢复', 'success')
-      setErrorMessage('')
-      return true
-    } catch (error) {
-      const message = '重新连接失败：' + String(error)
-      setHookProgress({ stage: 'error', message })
-      setErrorMessage(message)
-      toast(message, 'error')
-      return false
-    } finally {
-      setHookBusy(false)
-      void refresh()
-    }
+      },
+      onError: (message) => setHookProgress({ stage: 'error', message })
+    })
   }
 
-  const removeHook = async (): Promise<boolean> => {
-    if (hookBusy) return false
-    setHookBusy(true)
-    try {
-      if (window.electronAPI) {
-        const result = await window.electronAPI.app.removeHook()
-        if (!result.success) throw new Error(result.error || '删除连接失败')
-      }
-      window.dispatchEvent(new CustomEvent('hook-status-changed', { detail: { ready: false } }))
-      return true
-    } catch (error) {
-      const message = '删除连接失败：' + String(error)
-      setErrorMessage(message)
-      toast(message, 'error')
-      return false
-    } finally {
-      setHookBusy(false)
-    }
+  const removeHook = (): Promise<boolean> => {
+    if (hookBusy) return Promise.resolve(false)
+    return performAction({
+      setBusy: setHookBusy,
+      run: async () => {
+        if (window.electronAPI) {
+          const result = await window.electronAPI.app.removeHook()
+          if (!result.success) throw new Error(result.error || '删除连接失败')
+        }
+        window.dispatchEvent(new CustomEvent('hook-status-changed', { detail: { ready: false } }))
+      },
+      errorPrefix: '删除连接失败：'
+    })
   }
 
   const checkNow = async () => {
@@ -240,35 +252,25 @@ export function useDashboardData(onNavigateToSession: (sessionId: string, entrie
     }
   }
 
-  const removeEntry = async (id: string): Promise<boolean> => {
-    try {
+  const removeEntry = (id: string): Promise<boolean> => performAction({
+    successToast: '已删除该条记录',
+    errorPrefix: '删除通知失败：',
+    run: async () => {
       const result = await window.electronAPI?.notifyCenter.remove(id)
       if (result && !result.success) throw new Error('删除操作失败')
       applyEntries(entriesRef.current.filter((entry) => entry.id !== id))
-      toast('已删除该条记录', 'success')
-      return true
-    } catch (error) {
-      const message = '删除通知失败：' + String(error)
-      setErrorMessage(message)
-      toast(message, 'error')
-      return false
     }
-  }
+  })
 
-  const clearEntries = async (): Promise<boolean> => {
-    try {
+  const clearEntries = (): Promise<boolean> => performAction({
+    successToast: '通知历史已清空',
+    errorPrefix: '清空通知历史失败：',
+    run: async () => {
       const result = await window.electronAPI?.notifyCenter.clear()
       if (result && !result.success) throw new Error('清空操作失败')
       applyEntries([])
-      toast('通知历史已清空', 'success')
-      return true
-    } catch (error) {
-      const message = '清空通知历史失败：' + String(error)
-      setErrorMessage(message)
-      toast(message, 'error')
-      return false
     }
-  }
+  })
 
   return {
     status, config, entries, busy, checking, hookBusy, hookProgress, lastStatusAt, errorMessage,

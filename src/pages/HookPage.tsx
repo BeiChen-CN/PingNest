@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   AlertCircle, Check, CheckCircle2, Database, LoaderCircle, LockKeyhole,
-  Info, Maximize2, Minus, RefreshCw, ShieldCheck, Unplug, X
+  Info, RefreshCw, ShieldCheck, Unplug
 } from 'lucide-react'
 import type { HookProgress, HookStage } from '../features/dashboard/types'
+import { Titlebar } from '../components/Titlebar'
 import './HookPage.scss'
 
 interface Props {
@@ -103,14 +104,7 @@ export default function HookPage({ initialWechatRunning, onComplete }: Props) {
   }
 
   return <div className="hook-shell">
-    <header className="hook-titlebar">
-      <div className="hook-brand"><img src="./icon.png" alt="" /><b>PingNest</b></div>
-      <div className="hook-window-actions">
-        <button onClick={() => window.electronAPI?.app.minimize()} aria-label="最小化" title="最小化"><Minus size={14} /></button>
-        <button onClick={() => window.electronAPI?.app.toggleMaximize()} aria-label="最大化或还原" title="最大化或还原"><Maximize2 size={13} /></button>
-        <button className="close" onClick={() => window.electronAPI?.app.closeWindow()} aria-label="退出应用" title="退出应用"><X size={14} /></button>
-      </div>
-    </header>
+    <Titlebar variant="hook" />
 
     <main className="hook-main">
       <section className="hook-intro" aria-labelledby="hook-title">
