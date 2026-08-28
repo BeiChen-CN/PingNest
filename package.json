@@ -12,7 +12,7 @@
   "scripts": {
     "postinstall": "electron-builder install-app-deps && node scripts/prepare-electron-runtime.cjs",
     "dev": "node scripts/prepare-electron-runtime.cjs && vite --mode electron",
-    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/message-baseline.test.mjs tests/notification-layout.test.mjs tests/display-name.test.mjs tests/history-grouping.test.mjs tests/sql-message-content.test.mjs",
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/message-baseline.test.mjs tests/notification-layout.test.mjs tests/display-name.test.mjs tests/history-grouping.test.mjs tests/sql-message-content.test.mjs tests/message-revoke.test.mjs tests/message-dedupe.test.mjs tests/sql-builder.test.mjs",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
     "build": "tsc && vite build && electron-builder",
     "preview": "vite preview"

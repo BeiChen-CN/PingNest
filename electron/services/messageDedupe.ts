@@ -4,8 +4,11 @@
  */
 export class TtlKeyCache {
   private readonly entries = new Map<string, number>()
+  private readonly ttlMs: number
 
-  constructor(private readonly ttlMs: number) { }
+  constructor(ttlMs: number) {
+    this.ttlMs = ttlMs
+  }
 
   has(key: string): boolean {
     this.prune()
