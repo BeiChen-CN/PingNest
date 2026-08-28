@@ -7,6 +7,11 @@ export type { AppConfig as ConfigSchema, NotificationClickBehavior, Notification
 
 type ConfigSchema = AppConfig
 
+/** 对外下发的配置副本：脱敏掉密钥明文。 */
+export function getPublicConfig(cfg: ConfigSchema): ConfigSchema {
+  return { ...cfg, decryptKey: '' }
+}
+
 const DEFAULTS: ConfigSchema = DEFAULT_CONFIG
 
 // 敏感字段：decryptKey 用 safeStorage 加密存储

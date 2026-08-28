@@ -1,10 +1,13 @@
-import { join, dirname } from 'path'
-import { appendFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'fs'
+import { join } from 'path'
+import { appendFileSync, existsSync, mkdirSync } from 'fs'
 import { tmpdir } from 'os'
-import { createHash } from 'crypto'
 import { resolveSqlMessageSendState } from './messageDirection'
-import { cleanAccountDirName, expandHomePath } from './dbPathService'
 import { mapSqlMessageContent } from './sqlMessageContent'
+import { cleanAccountDirName, expandHomePath } from './dbPathService'
+import { WcdbFfiBindings } from './wcdb/ffiBindings'
+import { findMessageDbPaths, findSessionDb, resolveDbStoragePath } from './wcdb/paths'
+import { normalizeMessages, normalizeSessions, parseMessageJson } from './wcdb/normalizer'
+import { buildMessageTableExistsSql, buildMessagesByTableSql, buildName2IdRowIdSql, buildName2IdUsernameSql, messageTableName } from './wcdb/sqlBuilder'
 
 // 数据服务初始化错误信息
 let lastDllInitError: string | null = null
@@ -14,45 +17,23 @@ export function getLastDllInitError(): string | null {
 }
 
 /**
- * WcdbCore（移植自 WeFlow，裁剪）
+ * WcdbCore（移植自 WeFlow，裁剪）— 门面。
  * 通过 koffi 加载 wcdb_api.dll，提供微信 4.0 数据库的解密查询与变更监控。
+ * 职责已拆分：FFI 绑定见 wcdb/ffiBindings，路径探测见 wcdb/paths，
+ * 字段归一见 wcdb/normalizer，SQL 构造见 wcdb/sqlBuilder；本类只保留
+ * 连接句柄状态、监控管道与对外 API。
  */
 export class WcdbCore {
   private resourcesPath: string | null = null
   private userDataPath: string | null = null
   private logEnabled = false
-  private lib: any = null
-  private koffi: any = null
+  private readonly ffi = new WcdbFfiBindings()
   private initialized = false
   private handle: number | null = null
   private currentPath: string | null = null
   private currentKey: string | null = null
   private currentWxid: string | null = null
   private currentDbStoragePath: string | null = null
-
-  // 函数引用
-  private wcdbInitProtection: any = null
-  private wcdbInit: any = null
-  private wcdbShutdown: any = null
-  private wcdbOpenAccount: any = null
-  private wcdbSetMyWxid: any = null
-  private wcdbFreeString: any = null
-  private wcdbGetSessions: any = null
-  private wcdbGetMessages: any = null
-  private wcdbGetMessageCount: any = null
-  private wcdbGetDisplayNames: any = null
-  private wcdbGetAvatarUrls: any = null
-  private wcdbGetContact: any = null
-  private wcdbGetGroupNicknames: any = null
-  private wcdbGetLogs: any = null
-  private wcdbOpenMessageCursor: any = null
-  private wcdbOpenMessageCursorLite: any = null
-  private wcdbFetchMessageBatch: any = null
-  private wcdbCloseMessageCursor: any = null
-  private wcdbExecQuery: any = null
-  private wcdbStartMonitorPipe: any = null
-  private wcdbStopMonitorPipe: any = null
-  private wcdbGetMonitorPipeName: any = null
 
   // 监控管道
   private monitorPipeClient: any = null
@@ -95,7 +76,7 @@ export class WcdbCore {
 
     for (const filePath of Array.from(new Set(candidates))) {
       try {
-        const dir = dirname(filePath)
+        const dir = join(filePath, '..')
         if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
         appendFileSync(filePath, line + '\n', { encoding: 'utf8' })
         return
@@ -105,7 +86,7 @@ export class WcdbCore {
 
   /** 命名管道监控：微信数据库变化时回调 (type, json) */
   startMonitor(callback: (type: string, json: string) => void): boolean {
-    if (!this.wcdbStartMonitorPipe) {
+    if (!this.ffi.startMonitorPipeFn) {
       // EchoTrace/legacy builds do not expose the optional named-pipe API.
       // The message service will use its regular polling loop instead.
       this.monitorCallback = callback
@@ -114,17 +95,17 @@ export class WcdbCore {
     }
     this.monitorCallback = callback
     try {
-      const result = this.wcdbStartMonitorPipe()
+      const result = this.ffi.startMonitorPipeFn()
       this.writeLog('[monitor] wcdbStartMonitorPipe rc=' + result, true)
       if (result !== 0) return false
 
       let pipePath = '\\\\.\\pipe\\weflow_monitor'
-      if (this.wcdbGetMonitorPipeName) {
+      if (this.ffi.getMonitorPipeNameFn) {
         try {
           const namePtr = [null as any]
-          if (this.wcdbGetMonitorPipeName(namePtr) === 0 && namePtr[0]) {
-            pipePath = this.koffi.decode(namePtr[0], 'char', -1)
-            this.wcdbFreeString(namePtr[0])
+          if (this.ffi.getMonitorPipeNameFn(namePtr) === 0 && namePtr[0]) {
+            pipePath = this.ffi.decodeCString(namePtr[0])
+            this.ffi.freeString(namePtr[0])
           }
         } catch { }
       }
@@ -219,277 +200,18 @@ export class WcdbCore {
       this.monitorPipeClient.destroy()
       this.monitorPipeClient = null
     }
-    if (this.wcdbStopMonitorPipe) {
-      try { this.wcdbStopMonitorPipe() } catch { }
+    if (this.ffi.stopMonitorPipeFn) {
+      try { this.ffi.stopMonitorPipeFn() } catch { }
     }
-  }
-
-  /** 获取库文件路径（Windows 优先） */
-  private getDllPath(): string {
-    const isMac = process.platform === 'darwin'
-    const isLinux = process.platform === 'linux'
-    const isArm64 = process.arch === 'arm64'
-    const libName = isMac ? 'libwcdb_api.dylib' : isLinux ? 'libwcdb_api.so' : 'wcdb_api.dll'
-    const platformDir = isMac ? 'macos' : (isLinux ? 'linux' : 'win32')
-    const archDir = isMac ? 'universal' : (isArm64 ? 'arm64' : 'x64')
-
-    const envDllPath = process.env.WCDB_DLL_PATH
-    if (envDllPath && envDllPath.length > 0) return envDllPath
-
-    const isPackaged = typeof process['resourcesPath'] !== 'undefined'
-    const resourcesPath = isPackaged ? process.resourcesPath : join(process.cwd(), 'resources')
-    const roots = [
-      process.env.WCDB_RESOURCES_PATH || null,
-      this.resourcesPath || null,
-      join(resourcesPath, 'resources'),
-      resourcesPath,
-      join(process.cwd(), 'resources')
-    ].filter(Boolean) as string[]
-
-    const normalizedArch = process.arch === 'arm64' ? 'arm64' : 'x64'
-    const relativeCandidates = [
-      join('wcdb', platformDir, archDir, libName),
-      join('wcdb', platformDir, normalizedArch, libName),
-      join('wcdb', platformDir, 'x64', libName),
-      join('wcdb', platformDir, libName)
-    ]
-
-    for (const root of roots) {
-      for (const relativePath of relativeCandidates) {
-        const candidate = join(root, relativePath)
-        if (existsSync(candidate)) return candidate
-      }
-    }
-    return candidatesFallback(roots, relativeCandidates, libName)
-  }
-
-  private formatInitProtectionError(code: number): string {
-    const messages: Record<number, string> = {
-      '-1006': 'WCDB 授权或宿主环境校验失败。请使用与 PingNest 兼容的 wcdb_api.dll，不要直接使用 WeFlow/CipherTalk 授权版本',
-      '-102': 'WCDB 宿主校验失败，请确认使用的是为当前应用构建的 wcdb_api.dll',
-      '-101': 'WCDB 授权校验失败，请使用有效且未过期的 wcdb_api.dll',
-      '-3001': '未找到数据库目录 (db_storage)，请确认已选择正确的微信数据目录（应包含以 wxid_ 开头的子文件夹）',
-      '-3002': '未找到 session.db 文件，请确认微信已登录并且数据目录完整',
-      '-3003': '数据库句柄无效，请重试',
-      '-3004': '恢复数据库连接失败，请重试',
-      '-2301': '动态库加载失败，请检查安装是否完整',
-      '-2302': 'WCDB 初始化异常，请重试',
-      '-2303': 'WCDB 未能成功初始化'
-    }
-    const msg = messages[code]
-    return msg ? msg + ' (错误码: ' + code + ')' : '操作失败，错误码: ' + code
   }
 
   private async initialize(): Promise<boolean> {
     if (this.initialized) return true
 
-    try {
-      this.koffi = require('koffi')
-      const dllPath = this.getDllPath()
-      this.writeLog('[bootstrap] initialize platform=' + process.platform + ' dllPath=' + dllPath, true)
-
-      if (!existsSync(dllPath)) {
-        console.error('[wcdbCore] WCDB数据服务不存在:', dllPath)
-        lastDllInitError = '数据服务不存在: ' + dllPath
-        return false
-      }
-
-      const dllDir = dirname(dllPath)
-
-      // 预加载依赖库（WCDB.dll / SDL2.dll / libWCDB.dylib）
-      const deps: string[] = []
-      if (process.platform === 'darwin') deps.push(join(dllDir, 'libWCDB.dylib'))
-      if (process.platform === 'win32') {
-        deps.push(join(dllDir, 'WCDB.dll'))
-        deps.push(join(dllDir, 'SDL2.dll'))
-      }
-      for (const dep of deps) {
-        if (!existsSync(dep)) continue
-        try {
-          this.koffi.load(dep)
-        } catch (e) {
-          console.warn('[wcdbCore] 预加载依赖库失败（可能非致命）:', dep, e)
-        }
-      }
-
-      this.lib = this.koffi.load(dllPath)
-      this.writeLog('[bootstrap] koffi.load ok', true)
-
-      // InitProtection is present in the protected WeFlow builds. EchoTrace's
-      // MIT legacy build intentionally has no protection entry point, but does
-      // expose the complete basic wcdb_* ABI and can be used without spoofing
-      // the host executable metadata.
-      try {
-        try {
-          this.wcdbInitProtection = this.lib.func('int32 InitProtection(const char* resourcePath)')
-        } catch {
-          this.wcdbInitProtection = null
-          this.writeLog('[bootstrap] InitProtection export missing; probing legacy ABI', true)
-        }
-
-        if (this.wcdbInitProtection) {
-        const resourcePaths = [
-          dllDir,
-          dirname(dllDir),
-          process.resourcesPath,
-          process.resourcesPath ? join(process.resourcesPath as string, 'resources') : null,
-          this.resourcesPath,
-          join(process.cwd(), 'resources')
-        ].filter(Boolean)
-
-        let protectionOk = false
-        let protectionCode = -1
-        let bestFailCode: number | null = null
-        const scoreFailCode = (code: number): number => {
-          if (code >= -2212 && code <= -2201) return 0
-          if (code === -102 || code === -101 || code === -1006) return 1
-          return 2
-        }
-        for (const resPath of resourcePaths) {
-          try {
-            protectionCode = Number(this.wcdbInitProtection(resPath))
-            this.writeLog('[bootstrap] InitProtection(' + resPath + ') rc=' + protectionCode, true)
-            if (protectionCode === 0) {
-              protectionOk = true
-              break
-            }
-            if (bestFailCode === null || scoreFailCode(protectionCode) < scoreFailCode(bestFailCode)) {
-              bestFailCode = protectionCode
-            }
-          } catch (e) {
-            this.writeLog('[bootstrap] InitProtection(' + resPath + ') THROW: ' + String(e), true)
-          }
-        }
-        if (!protectionOk) {
-          const finalCode = bestFailCode ?? protectionCode
-          lastDllInitError = this.formatInitProtectionError(finalCode)
-          this.writeLog('[bootstrap] InitProtection failed finalCode=' + finalCode, true)
-          return false
-        }
-        }
-      } catch (e) {
-        lastDllInitError = this.formatInitProtectionError(-2301)
-        return false
-      }
-
-      this.wcdbInit = this.lib.func('int32 wcdb_init()')
-      this.wcdbShutdown = this.lib.func('int32 wcdb_shutdown()')
-      this.wcdbOpenAccount = this.lib.func('int32 wcdb_open_account(const char* path, const char* key, _Out_ int64* handle)')
-      this.wcdbFreeString = this.lib.func('void wcdb_free_string(void* ptr)')
-
-      try {
-        this.wcdbSetMyWxid = this.lib.func('int32 wcdb_set_my_wxid(int64 handle, const char* wxid)')
-      } catch {
-        this.wcdbSetMyWxid = null
-      }
-
-      this.wcdbGetSessions = this.lib.func('int32 wcdb_get_sessions(int64 handle, _Out_ void** outJson)')
-      this.wcdbGetMessages = this.lib.func('int32 wcdb_get_messages(int64 handle, const char* username, int32 limit, int32 offset, _Out_ void** outJson)')
-      this.wcdbGetMessageCount = this.lib.func('int32 wcdb_get_message_count(int64 handle, const char* username, _Out_ int32* outCount)')
-      this.wcdbGetDisplayNames = this.lib.func('int32 wcdb_get_display_names(int64 handle, const char* usernamesJson, _Out_ void** outJson)')
-      this.wcdbGetAvatarUrls = this.lib.func('int32 wcdb_get_avatar_urls(int64 handle, const char* usernamesJson, _Out_ void** outJson)')
-      try {
-        this.wcdbGetContact = this.lib.func('int32 wcdb_get_contact(int64 handle, const char* username, _Out_ void** outJson)')
-      } catch {
-        this.wcdbGetContact = null
-      }
-
-      try {
-        this.wcdbGetGroupNicknames = this.lib.func('int32 wcdb_get_group_nicknames(int64 handle, const char* chatroomId, _Out_ void** outJson)')
-      } catch {
-        this.wcdbGetGroupNicknames = null
-      }
-
-      try {
-        this.wcdbOpenMessageCursor = this.lib.func('int32 wcdb_open_message_cursor(int64 handle, const char* sessionId, int32 batchSize, int32 ascending, int32 beginTimestamp, int32 endTimestamp, _Out_ int64* outCursor)')
-      } catch {
-        this.wcdbOpenMessageCursor = null
-      }
-      try {
-        this.wcdbOpenMessageCursorLite = this.lib.func('int32 wcdb_open_message_cursor_lite(int64 handle, const char* sessionId, int32 batchSize, int32 ascending, int32 beginTimestamp, int32 endTimestamp, _Out_ int64* outCursor)')
-      } catch {
-        this.wcdbOpenMessageCursorLite = null
-      }
-      try {
-        this.wcdbFetchMessageBatch = this.lib.func('int32 wcdb_fetch_message_batch(int64 handle, int64 cursor, _Out_ void** outJson, _Out_ int32* outHasMore)')
-      } catch {
-        this.wcdbFetchMessageBatch = null
-      }
-      try {
-        this.wcdbCloseMessageCursor = this.lib.func('int32 wcdb_close_message_cursor(int64 handle, int64 cursor)')
-      } catch {
-        this.wcdbCloseMessageCursor = null
-      }
-
-      const requiredLegacy = [
-        ['wcdb_init', this.wcdbInit],
-        ['wcdb_open_account', this.wcdbOpenAccount],
-        ['wcdb_get_sessions', this.wcdbGetSessions],
-        ['wcdb_get_messages', this.wcdbGetMessages],
-        ['wcdb_get_message_count', this.wcdbGetMessageCount],
-        ['wcdb_get_display_names', this.wcdbGetDisplayNames],
-        ['wcdb_get_avatar_urls', this.wcdbGetAvatarUrls]
-      ]
-      if (!this.wcdbInitProtection) {
-        const missing = requiredLegacy.filter(([, fn]) => !fn).map(([name]) => name)
-        if (missing.length > 0) {
-          lastDllInitError = '检测到不兼容的 wcdb_api.dll：缺少基础接口 ' + missing.join(', ')
-          this.writeLog('[bootstrap] legacy ABI rejected missing=' + missing.join(','), true)
-          return false
-        }
-      }
-
-      try {
-        this.wcdbExecQuery = this.lib.func('int32 wcdb_exec_query(int64 handle, const char* kind, const char* path, const char* sql, _Out_ void** outJson)')
-      } catch {
-        this.wcdbExecQuery = null
-      }
-
-      try {
-        this.wcdbStartMonitorPipe = this.lib.func('int32 wcdb_start_monitor_pipe()')
-        this.wcdbStopMonitorPipe = this.lib.func('void wcdb_stop_monitor_pipe()')
-        this.wcdbGetMonitorPipeName = this.lib.func('int32 wcdb_get_monitor_pipe_name(_Out_ void** outName)')
-      } catch (e) {
-        console.warn('[wcdbCore] 监控管道函数加载失败:', e)
-        this.wcdbStartMonitorPipe = null
-        this.wcdbStopMonitorPipe = null
-        this.wcdbGetMonitorPipeName = null
-      }
-
-      try {
-        this.wcdbGetLogs = this.lib.func('int32 wcdb_get_logs(_Out_ void** outJson)')
-      } catch {
-        this.wcdbGetLogs = null
-      }
-
-      const initResult = this.wcdbInit()
-      this.writeLog('[bootstrap] wcdb_init rc=' + initResult, true)
-      if (initResult !== 0) {
-        // 尝试读取 C++ 侧日志定位失败原因
-        if (this.wcdbGetLogs) {
-          try {
-            const outPtr = [null as any]
-            const logsRc = this.wcdbGetLogs(outPtr)
-            if (logsRc === 0 && outPtr[0]) {
-              const jsonStr = this.koffi.decode(outPtr[0], 'char', -1)
-              try { this.wcdbFreeString(outPtr[0]) } catch { }
-              this.writeLog('[bootstrap] C++ logs: ' + String(jsonStr || '').slice(0, 2000), true)
-              console.error('[wcdbCore] C++ logs:', String(jsonStr || '').slice(0, 2000))
-            }
-          } catch { }
-        }
-        lastDllInitError = this.formatInitProtectionError(initResult)
-        return false
-      }
-
-      this.initialized = true
-      lastDllInitError = null
-      return true
-    } catch (e) {
-      console.error('[wcdbCore] WCDB 初始化异常:', e)
-      lastDllInitError = this.formatInitProtectionError(-2302)
-      return false
-    }
+    const result = await this.ffi.initialize(this.resourcesPath, (message, force) => this.writeLog(message, force))
+    lastDllInitError = result.ok ? null : (result.error || lastDllInitError)
+    if (result.ok) this.initialized = true
+    return result.ok
   }
 
   /** 打开数据库 */
@@ -515,32 +237,32 @@ export class WcdbCore {
         if (!initOk) return false
       }
 
-      const dbStoragePath = this.resolveDbStoragePath(dbPath, accountWxid)
+      const dbStoragePath = resolveDbStoragePath(dbPath, accountWxid)
       this.writeLog('[open] dbStoragePath=' + (dbStoragePath || 'null'), true)
       if (!dbStoragePath || !existsSync(dbStoragePath)) {
-        lastDllInitError = this.formatInitProtectionError(-3001)
+        lastDllInitError = this.ffi.formatInitProtectionError(-3001)
         return false
       }
 
-      const sessionDbPath = this.findSessionDb(dbStoragePath)
+      const sessionDbPath = findSessionDb(dbStoragePath)
       this.writeLog('[open] sessionDbPath=' + (sessionDbPath || 'null'), true)
       if (!sessionDbPath) {
-        lastDllInitError = this.formatInitProtectionError(-3002)
+        lastDllInitError = this.ffi.formatInitProtectionError(-3002)
         return false
       }
 
       this.writeLog('[open] key length=' + String(hexKey || '').length + ' dbPath=' + dbPath + ' wxid=' + wxid, true)
       const handleOut = [0]
-      const result = this.wcdbOpenAccount(sessionDbPath, hexKey, handleOut)
+      const result = this.ffi.openAccount(sessionDbPath, hexKey, handleOut)
       this.writeLog('[open] openAccount rc=' + result + ' handle=' + handleOut[0], true)
       if (result !== 0) {
-        lastDllInitError = this.formatInitProtectionError(result)
+        lastDllInitError = this.ffi.formatInitProtectionError(result)
         return false
       }
 
       const handle = handleOut[0]
       if (handle <= 0) {
-        lastDllInitError = this.formatInitProtectionError(-3003)
+        lastDllInitError = this.ffi.formatInitProtectionError(-3003)
         return false
       }
 
@@ -553,14 +275,14 @@ export class WcdbCore {
       this.initialized = true
       lastDllInitError = null
 
-      if (this.wcdbSetMyWxid && accountWxid) {
-        try { this.wcdbSetMyWxid(this.handle, accountWxid) } catch { }
+      if (this.ffi.setMyWxidFn && accountWxid) {
+        try { this.ffi.setMyWxidFn(this.handle, accountWxid) } catch { }
       }
       this.writeLog('open ok handle=' + handle, true)
       return true
     } catch (e) {
       console.error('[wcdbCore] 打开数据库异常:', e)
-      lastDllInitError = this.formatInitProtectionError(-3004)
+      lastDllInitError = this.ffi.formatInitProtectionError(-3004)
       return false
     }
   }
@@ -568,9 +290,7 @@ export class WcdbCore {
   close(): void {
     if (this.handle !== null || this.initialized) {
       try { this.stopMonitor() } catch { }
-      try { this.wcdbShutdown() } catch (e) {
-        console.error('[wcdbCore] WCDB shutdown 出错:', e)
-      }
+      this.ffi.shutdown()
       this.handle = null
       this.currentPath = null
       this.currentKey = null
@@ -594,81 +314,17 @@ export class WcdbCore {
     return this.initialized && this.handle !== null
   }
 
-  private decodeJsonPtr(outPtr: any): string | null {
-    if (!outPtr) return null
-    try {
-      const jsonStr = this.koffi.decode(outPtr, 'char', -1)
-      this.wcdbFreeString(outPtr)
-      return jsonStr
-    } catch (e) {
-      try { this.wcdbFreeString(outPtr) } catch { }
-      return null
-    }
-  }
-
-  private parseMessageJson(jsonStr: string): any {
-    const raw = String(jsonStr || '')
-    if (!raw) return []
-    const needsInt64Normalize = /"server_id"\s*:\s*-?\d{16,}/.test(raw)
-    if (!needsInt64Normalize) return JSON.parse(raw)
-    const normalized = raw.replace(/("server_id"\s*:\s*)(-?\d{16,})/g, '$1"$2"')
-    return JSON.parse(normalized)
-  }
-
-  /** Normalize EchoTrace snake_case/computed fields to the push service shape. */
-  private normalizeMessages(messages: any[], sessionId: string): any[] {
-    if (!Array.isArray(messages)) return []
-    return messages.map((message: any) => {
-      if (!message || typeof message !== 'object') return message
-      const localId = Number(message.localId ?? message.local_id ?? message.msg_id ?? message.id ?? 0)
-      const createTime = Number(message.createTime ?? message.create_time ?? message.timestamp ?? 0)
-      const serverId = message.serverId ?? message.server_id ?? message.serverIdRaw ?? ''
-      const rawContent = message.rawContent ?? message.raw_content ?? message.message_content ?? message.msg_content ?? message.content ?? ''
-      const parsedContent = message.parsedContent ?? message.parsed_content ?? rawContent
-      const isSend = message.isSend ?? message.is_send ?? message.computed_is_send ?? message.computedIsSend ?? null
-      const messageKey = String(message.messageKey ?? message.message_key ?? '') || [sessionId, localId, createTime, String(serverId)].join(':')
-      return {
-        ...message,
-        messageKey,
-        localId,
-        createTime,
-        serverId: serverId === '' ? undefined : serverId,
-        serverIdRaw: serverId === '' ? undefined : String(serverId),
-        isSend,
-        rawContent: String(rawContent ?? ''),
-        parsedContent: String(parsedContent ?? ''),
-        localType: Number(message.localType ?? message.local_type ?? message.type ?? 0)
-      }
-    })
-  }
-
-  private normalizeSessions(sessions: any[]): any[] {
-    if (!Array.isArray(sessions)) return []
-    return sessions.map((session: any) => {
-      if (!session || typeof session !== 'object') return session
-      const username = String(session.username ?? session.user_name ?? session.session_id ?? session.sessionId ?? session.wxid ?? '').trim()
-      const lastTimestamp = Number(session.lastTimestamp ?? session.last_timestamp ?? session.last_msg_time ?? session.last_message_time ?? session.last_create_time ?? 0)
-      const unreadCount = Number(session.unreadCount ?? session.unread_count ?? session.unread ?? 0)
-      return {
-        ...session,
-        username,
-        last_timestamp: lastTimestamp,
-        unread_count: unreadCount
-      }
-    }).filter((session: any) => session.username)
-  }
-
   async getSessions(): Promise<{ success: boolean; sessions?: any[]; error?: string }> {
     if (!this.ensureReady()) return { success: false, error: 'WCDB 未连接' }
     try {
       await new Promise(resolve => setImmediate(resolve))
       const outPtr = [null as any]
-      const result = this.wcdbGetSessions(this.handle, outPtr)
+      const result = this.ffi.getSessionsFn(this.handle, outPtr)
       await new Promise(resolve => setImmediate(resolve))
       if (result !== 0 || !outPtr[0]) return { success: false, error: '获取会话失败: ' + result }
-      const jsonStr = this.decodeJsonPtr(outPtr[0])
+      const jsonStr = this.ffi.decodeJsonPtr(outPtr[0])
       if (!jsonStr) return { success: false, error: '解析会话失败' }
-      return { success: true, sessions: this.normalizeSessions(JSON.parse(jsonStr)) }
+      return { success: true, sessions: normalizeSessions(JSON.parse(jsonStr)) }
     } catch (e) {
       return { success: false, error: String(e) }
     }
@@ -678,11 +334,11 @@ export class WcdbCore {
     if (!this.ensureReady()) return { success: false, error: 'WCDB 未连接' }
     try {
       const outPtr = [null as any]
-      const result = this.wcdbGetMessages(this.handle, sessionId, limit, offset, outPtr)
+      const result = this.ffi.getMessagesFn(this.handle, sessionId, limit, offset, outPtr)
       if (result !== 0 || !outPtr[0]) return { success: false, error: '获取消息失败: ' + result }
-      const jsonStr = this.decodeJsonPtr(outPtr[0])
+      const jsonStr = this.ffi.decodeJsonPtr(outPtr[0])
       if (!jsonStr) return { success: false, error: '解析消息失败' }
-      return { success: true, messages: this.normalizeMessages(this.parseMessageJson(jsonStr), sessionId) }
+      return { success: true, messages: normalizeMessages(parseMessageJson(jsonStr), sessionId) }
     } catch (e) {
       return { success: false, error: String(e) }
     }
@@ -717,7 +373,7 @@ export class WcdbCore {
 
       // Legacy builds do not expose cursors or SQL execution. Use the basic
       // message endpoint as a bounded fallback before trying project SQL.
-      if (!this.wcdbOpenMessageCursorLite && !this.wcdbOpenMessageCursor && this.wcdbGetMessages) {
+      if (!this.ffi.hasMessageCursor && this.ffi.getMessagesFn) {
         const basic = await this.getMessages(sessionId, Math.min(Math.max(1, Math.floor(Number(limit) || 1000)), 5000), 0)
         if (basic.success && Array.isArray(basic.messages)) {
           const since = Math.max(0, Math.floor(Number(minTime) || 0))
@@ -748,62 +404,26 @@ export class WcdbCore {
   private async queryMessagesBySql(sessionId: string, minTime: number, limit: number): Promise<any[]> {
     const dbStorage = this.currentDbStoragePath
     if (!dbStorage) return []
-    const tableHash = createHash('md5').update(String(sessionId || '')).digest('hex').toLowerCase()
-    const dbPaths = this.findMessageDbPaths(dbStorage)
+    const dbPaths = findMessageDbPaths(dbStorage)
     if (dbPaths.length === 0) return []
 
     const results: any[] = []
 
     for (const dbPath of dbPaths) {
       // 表存在性检查（大小写不敏感）
-      const existsRes = await this.execQuery(
-        'message',
-        dbPath,
-        'SELECT name FROM sqlite_master WHERE type=\'table\' AND lower(name)=\'msg_' + tableHash + '\''
-      )
+      const existsRes = await this.execQuery('message', dbPath, buildMessageTableExistsSql(sessionId))
       if (!existsRes.success || !Array.isArray(existsRes.rows) || existsRes.rows.length === 0) continue
 
-      const tableName = 'Msg_' + tableHash
-      const safeSince = Math.max(0, Math.floor(Number(minTime) || 0))
-      const safeLimit = Math.min(Math.max(1, Math.floor(Number(limit) || 100)), 5000)
-      const rowsRes = await this.execQuery(
-        'message',
-        dbPath,
-        'SELECT * FROM "' + tableName + '" WHERE create_time > ' + safeSince + ' ORDER BY sort_seq ASC LIMIT ' + safeLimit
-      )
+      const rowsRes = await this.execQuery('message', dbPath, buildMessagesByTableSql(sessionId, minTime, limit))
       if (!rowsRes.success || !Array.isArray(rowsRes.rows)) continue
 
       const myRowId = await this.getMyRowId(dbPath)
+      const tableName = messageTableName(sessionId)
       for (const row of rowsRes.rows) {
         results.push(await this.mapSqlMessage(row, dbPath, tableName, myRowId, sessionId))
       }
     }
 
-    return results
-  }
-
-  /** 扫描 db_storage 下所有 message_*.db */
-  private findMessageDbPaths(dbStoragePath: string): string[] {
-    const results: string[] = []
-    const scan = (dir: string, depth = 0): void => {
-      if (depth > 4) return
-      let entries: string[]
-      try { entries = readdirSync(dir) } catch { return }
-      for (const entry of entries) {
-        const full = join(dir, entry)
-        let st: ReturnType<typeof statSync>
-        try { st = statSync(full) } catch { continue }
-        if (st.isFile()) {
-          const lower = entry.toLowerCase()
-          if ((lower.startsWith('msg_') || lower.startsWith('message_')) && lower.endsWith('.db')) {
-            if (!results.includes(full)) results.push(full)
-          }
-        } else if (st.isDirectory()) {
-          scan(full, depth + 1)
-        }
-      }
-    }
-    scan(dbStoragePath)
     return results
   }
 
@@ -819,11 +439,7 @@ export class WcdbCore {
     ]
     for (const candidate of candidates) {
       if (!candidate) continue
-      const res = await this.execQuery(
-        'message',
-        dbPath,
-        'SELECT rowid FROM Name2Id WHERE user_name = \'' + candidate.replace(/'/g, "''") + '\' LIMIT 1'
-      )
+      const res = await this.execQuery('message', dbPath, buildName2IdRowIdSql(candidate))
       if (res.success && Array.isArray(res.rows) && res.rows.length > 0) {
         const rowId = Number(res.rows[0]?.rowid ?? res.rows[0]?.RowId ?? 0)
         if (rowId > 0) {
@@ -838,11 +454,7 @@ export class WcdbCore {
 
   /** Name2Id 反查：rowid → user_name（群消息发送者） */
   private async resolveSenderUsername(dbPath: string, realSenderId: number): Promise<string> {
-    const res = await this.execQuery(
-      'message',
-      dbPath,
-      'SELECT user_name FROM Name2Id WHERE rowid = ' + Math.floor(Number(realSenderId) || 0) + ' LIMIT 1'
-    )
+    const res = await this.execQuery('message', dbPath, buildName2IdUsernameSql(realSenderId))
     if (res.success && Array.isArray(res.rows) && res.rows.length > 0) {
       return String(res.rows[0]?.user_name || '')
     }
@@ -883,9 +495,9 @@ export class WcdbCore {
   async openMessageCursor(sessionId: string, batchSize: number, ascending: boolean, beginTimestamp: number, endTimestamp: number): Promise<{ success: boolean; cursor?: number; error?: string }> {
     if (!this.ensureReady()) return { success: false, error: 'WCDB 未连接' }
     try {
-      const outCursor = [0]
-      const fn = this.wcdbOpenMessageCursorLite || this.wcdbOpenMessageCursor
+      const fn = this.ffi.openMessageCursorFn
       if (!fn) return { success: false, error: '当前 WCDB 构建不提供消息游标接口' }
+      const outCursor = [0]
       const result = fn(
         this.handle, sessionId, batchSize, ascending ? 1 : 0,
         Math.floor(beginTimestamp), Math.floor(endTimestamp), outCursor
@@ -902,23 +514,23 @@ export class WcdbCore {
   async fetchMessageBatch(cursor: number): Promise<{ success: boolean; rows?: any[]; hasMore?: boolean; error?: string }> {
     if (!this.ensureReady()) return { success: false, error: 'WCDB 未连接' }
     try {
-      if (!this.wcdbFetchMessageBatch) return { success: false, error: '当前 WCDB 构建不提供消息批量接口' }
+      if (!this.ffi.fetchMessageBatchFn) return { success: false, error: '当前 WCDB 构建不提供消息批量接口' }
       const outPtr = [null as any]
       const outHasMore = [0]
-      const result = this.wcdbFetchMessageBatch(this.handle, cursor, outPtr, outHasMore)
+      const result = this.ffi.fetchMessageBatchFn(this.handle, cursor, outPtr, outHasMore)
       if (result !== 0 || !outPtr[0]) return { success: false, error: 'fetchMessageBatch failed: ' + result }
-      const jsonStr = this.decodeJsonPtr(outPtr[0])
+      const jsonStr = this.ffi.decodeJsonPtr(outPtr[0])
       if (!jsonStr) return { success: false, error: '解析批次失败' }
-      return { success: true, rows: this.parseMessageJson(jsonStr), hasMore: Number(outHasMore[0]) > 0 }
+      return { success: true, rows: parseMessageJson(jsonStr), hasMore: Number(outHasMore[0]) > 0 }
     } catch (e) {
       return { success: false, error: String(e) }
     }
   }
 
   async closeMessageCursor(cursor: number): Promise<{ success: boolean; error?: string }> {
-    if (!this.wcdbCloseMessageCursor) return { success: false, error: '当前 WCDB 构建不提供消息游标接口' }
+    if (!this.ffi.closeMessageCursorFn) return { success: false, error: '当前 WCDB 构建不提供消息游标接口' }
     try {
-      const result = this.wcdbCloseMessageCursor(this.handle, cursor)
+      const result = this.ffi.closeMessageCursorFn(this.handle, cursor)
       return { success: result === 0, error: result !== 0 ? 'closeMessageCursor failed: ' + result : undefined }
     } catch (e) {
       return { success: false, error: String(e) }
@@ -932,10 +544,10 @@ export class WcdbCore {
     try {
       await new Promise(resolve => setImmediate(resolve))
       const outPtr = [null as any]
-      const result = this.wcdbGetDisplayNames(this.handle, JSON.stringify(uniq), outPtr)
+      const result = this.ffi.getDisplayNamesFn(this.handle, JSON.stringify(uniq), outPtr)
       await new Promise(resolve => setImmediate(resolve))
       if (result !== 0 || !outPtr[0]) return { success: false, error: '获取昵称失败: ' + result }
-      const jsonStr = this.decodeJsonPtr(outPtr[0])
+      const jsonStr = this.ffi.decodeJsonPtr(outPtr[0])
       if (!jsonStr) return { success: false, error: '解析昵称失败' }
       return { success: true, map: JSON.parse(jsonStr) }
     } catch (e) {
@@ -962,13 +574,13 @@ export class WcdbCore {
       if (toFetch.length === 0) return { success: true, map: resultMap }
 
       const outPtr = [null as any]
-      const result = this.wcdbGetAvatarUrls(this.handle, JSON.stringify(toFetch), outPtr)
+      const result = this.ffi.getAvatarUrlsFn(this.handle, JSON.stringify(toFetch), outPtr)
       await new Promise(resolve => setImmediate(resolve))
       if (result !== 0 || !outPtr[0]) {
         if (Object.keys(resultMap).length > 0) return { success: true, map: resultMap, error: '获取头像失败: ' + result }
         return { success: false, error: '获取头像失败: ' + result }
       }
-      const jsonStr = this.decodeJsonPtr(outPtr[0])
+      const jsonStr = this.ffi.decodeJsonPtr(outPtr[0])
       if (!jsonStr) return { success: false, error: '解析头像失败' }
       const map = JSON.parse(jsonStr) as Record<string, string>
       for (const username of toFetch) {
@@ -986,12 +598,12 @@ export class WcdbCore {
 
   async getContact(username: string): Promise<{ success: boolean; contact?: any; error?: string }> {
     if (!this.ensureReady()) return { success: false, error: 'WCDB 未连接' }
-    if (!this.wcdbGetContact) return { success: false, error: '当前 WCDB 构建不提供联系人接口' }
+    if (!this.ffi.getContactFn) return { success: false, error: '当前 WCDB 构建不提供联系人接口' }
     try {
       const outPtr = [null as any]
-      const result = this.wcdbGetContact(this.handle, username, outPtr)
+      const result = this.ffi.getContactFn(this.handle, username, outPtr)
       if (result !== 0 || !outPtr[0]) return { success: false, error: '获取联系人失败: ' + result }
-      const jsonStr = this.decodeJsonPtr(outPtr[0])
+      const jsonStr = this.ffi.decodeJsonPtr(outPtr[0])
       if (!jsonStr) return { success: false, error: '解析联系人失败' }
       return { success: true, contact: JSON.parse(jsonStr) }
     } catch (e) {
@@ -1000,12 +612,12 @@ export class WcdbCore {
   }
 
   async getGroupNicknames(chatroomId: string): Promise<{ success: boolean; map?: Record<string, string>; error?: string }> {
-    if (!this.ensureReady() || !this.wcdbGetGroupNicknames) return { success: false, error: '接口未就绪' }
+    if (!this.ensureReady() || !this.ffi.getGroupNicknamesFn) return { success: false, error: '接口未就绪' }
     try {
       const outPtr = [null as any]
-      const result = this.wcdbGetGroupNicknames(this.handle, chatroomId, outPtr)
+      const result = this.ffi.getGroupNicknamesFn(this.handle, chatroomId, outPtr)
       if (result !== 0 || !outPtr[0]) return { success: false, error: '获取群昵称失败: ' + result }
-      const jsonStr = this.decodeJsonPtr(outPtr[0])
+      const jsonStr = this.ffi.decodeJsonPtr(outPtr[0])
       if (!jsonStr) return { success: false, error: '解析群昵称失败' }
       return { success: true, map: JSON.parse(jsonStr) }
     } catch (e) {
@@ -1014,95 +626,18 @@ export class WcdbCore {
   }
 
   async execQuery(kind: string, dbPath: string | null, sql: string): Promise<{ success: boolean; rows?: any[]; error?: string }> {
-    if (!this.ensureReady() || !this.wcdbExecQuery) return { success: false, error: '接口未就绪' }
+    if (!this.ensureReady() || !this.ffi.execQueryFn) return { success: false, error: '接口未就绪' }
     try {
       const outPtr = [null as any]
-      const result = this.wcdbExecQuery(this.handle, kind, dbPath || null, sql, outPtr)
+      const result = this.ffi.execQueryFn(this.handle, kind, dbPath || null, sql, outPtr)
       if (result !== 0 || !outPtr[0]) return { success: false, error: '查询失败: ' + result }
-      const jsonStr = this.decodeJsonPtr(outPtr[0])
+      const jsonStr = this.ffi.decodeJsonPtr(outPtr[0])
       if (!jsonStr) return { success: false, error: '解析查询结果失败' }
       return { success: true, rows: JSON.parse(jsonStr) }
     } catch (e) {
       return { success: false, error: String(e) }
     }
   }
-
-  // --- 路径解析 ---
-
-  private resolveDbStoragePath(basePath: string, wxid: string): string | null {
-    if (!basePath) return null
-    const normalized = expandHomePath(basePath).replace(/[\\/]+$/, '')
-    if (normalized.toLowerCase().endsWith('db_storage') && existsSync(normalized)) return normalized
-    const direct = join(normalized, 'db_storage')
-    if (existsSync(direct)) return direct
-    if (wxid) {
-      const viaWxid = join(normalized, wxid, 'db_storage')
-      if (existsSync(viaWxid)) return viaWxid
-      try {
-        const entries = readdirSync(normalized)
-        const lowerWxid = wxid.toLowerCase()
-        const candidates = entries.filter(entry => {
-          try {
-            const entryPath = join(normalized, entry)
-            if (!statSync(entryPath).isDirectory()) return false
-          } catch { return false }
-          const lowerEntry = entry.toLowerCase()
-          return lowerEntry === lowerWxid || lowerEntry.startsWith(lowerWxid + '_')
-        })
-        for (const entry of candidates) {
-          const candidate = join(normalized, entry, 'db_storage')
-          if (existsSync(candidate)) return candidate
-        }
-      } catch { }
-    }
-    try {
-      let parent = normalized
-      for (let i = 0; i < 2; i++) {
-        const up = join(parent, '..')
-        if (up === parent) break
-        parent = up
-        const candidateUp = join(parent, 'db_storage')
-        if (existsSync(candidateUp)) return candidateUp
-        if (wxid) {
-          const viaWxidUp = join(parent, wxid, 'db_storage')
-          if (existsSync(viaWxidUp)) return viaWxidUp
-        }
-      }
-    } catch { }
-    return null
-  }
-
-  private findSessionDb(dir: string, depth = 0): string | null {
-    if (depth > 5) return null
-    try {
-      const entries = readdirSync(dir)
-      for (const entry of entries) {
-        if (entry.toLowerCase() === 'session.db') {
-          const fullPath = join(dir, entry)
-          if (statSync(fullPath).isFile()) return fullPath
-        }
-      }
-      for (const entry of entries) {
-        const fullPath = join(dir, entry)
-        try {
-          if (statSync(fullPath).isDirectory()) {
-            const found = this.findSessionDb(fullPath, depth + 1)
-            if (found) return found
-          }
-        } catch { }
-      }
-    } catch { }
-    return null
-  }
-}
-
-function candidatesFallback(roots: string[], relativeCandidates: string[], libName: string): string {
-  for (const root of roots) {
-    for (const relativePath of relativeCandidates) {
-      return join(root, relativePath)
-    }
-  }
-  return libName
 }
 
 export const wcdbCore = new WcdbCore()

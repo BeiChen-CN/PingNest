@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events'
-import { chatService, type ChatSession } from './chatService'
+import { chatService as defaultChatService, type ChatService, type ChatSession } from './chatService'
 import { ConfigService } from './config'
 import { getMessageDisplayContent } from '../../shared/messageContent'
 import { normalizeMessageSendState, shouldPushIncomingMessage } from './messageDirection'
@@ -9,6 +9,13 @@ import {
   shouldInspectSession,
   type SessionBaseline
 } from './messageBaseline'
+import {
+  extractReplaceMsg,
+  findRevokedOriginalInMessages,
+  isRevokeSystemMessage,
+  isSelfRevokeMessage
+} from './messageRevoke'
+import { TtlKeyCache } from './messageDedupe'
 
 export interface MessagePushPayload {
   event: 'message.new' | 'message.revoke'
@@ -27,20 +34,27 @@ interface PushSessionResult {
   success: boolean
 }
 
+interface MessagePushDeps {
+  configService?: ConfigService
+  chatService?: ChatService
+}
+
 /**
  * MessagePushService（移植自 WeFlow，裁剪）
  * 监听微信数据库变化 → 防抖 → 对比会话基线 → 查询新消息 → 去重 → 广播推送事件。
+ * 撤回识别见 messageRevoke（纯函数），去重缓存见 messageDedupe；
+ * 依赖可注入以便测试，默认使用模块单例。
  */
 export class MessagePushService extends EventEmitter {
   private readonly configService: ConfigService
+  private readonly chatService: ChatService
   private readonly sessionBaseline = new Map<string, SessionBaseline>()
-  private readonly recentMessageKeys = new Map<string, number>()
-  private readonly seenMessageKeys = new Map<string, number>()
+  /** 同一 messageKey 在 TTL 内只处理/推送一次 */
+  private readonly handledMessageKeys = new TtlKeyCache(10 * 60 * 1000)
   private readonly groupNicknameCache = new Map<string, { nicknames: Record<string, string>; updatedAt: number }>()
 
   private readonly debounceMs = 350
   private readonly lookbackSeconds = 2
-  private readonly recentMessageTtlMs = 10 * 60 * 1000
   private readonly groupNicknameCacheTtlMs = 5 * 60 * 1000
 
   private debounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -52,9 +66,10 @@ export class MessagePushService extends EventEmitter {
   private baselineReady = false
   private runGeneration = 0
 
-  constructor() {
+  constructor(deps: MessagePushDeps = {}) {
     super()
-    this.configService = ConfigService.getInstance()
+    this.configService = deps.configService || ConfigService.getInstance()
+    this.chatService = deps.chatService || defaultChatService
   }
 
   start(): void {
@@ -134,8 +149,7 @@ export class MessagePushService extends EventEmitter {
 
   private resetRuntimeState(): void {
     this.sessionBaseline.clear()
-    this.recentMessageKeys.clear()
-    this.seenMessageKeys.clear()
+    this.handledMessageKeys.clear()
     this.groupNicknameCache.clear()
     this.baselineReady = false
     if (this.debounceTimer) {
@@ -158,7 +172,7 @@ export class MessagePushService extends EventEmitter {
       this.resetRuntimeState()
       return
     }
-    const connectResult = await chatService.connect()
+    const connectResult = await this.chatService.connect()
     if (!this.isGenerationActive(generation)) return
     if (!connectResult.success) {
       console.warn('[MessagePushService] Bootstrap connect failed (' + reason + '):', connectResult.error)
@@ -169,7 +183,7 @@ export class MessagePushService extends EventEmitter {
 
   private async bootstrapBaseline(generation: number): Promise<void> {
     if (!this.isGenerationActive(generation)) return
-    const sessionsResult = await chatService.getSessions()
+    const sessionsResult = await this.chatService.getSessions()
     if (!this.isGenerationActive(generation)) return
     if (!sessionsResult.success || !sessionsResult.sessions) return
     this.setBaseline(sessionsResult.sessions as ChatSession[])
@@ -205,7 +219,7 @@ export class MessagePushService extends EventEmitter {
     try {
       if (!this.isGenerationActive(generation) || !this.isPushEnabled()) return
 
-      const connectResult = await chatService.connect()
+      const connectResult = await this.chatService.connect()
       if (!this.isGenerationActive(generation)) return
       if (!connectResult.success) {
         console.warn('[MessagePushService] Sync connect failed:', connectResult.error)
@@ -213,7 +227,7 @@ export class MessagePushService extends EventEmitter {
         return
       }
 
-      const sessionsResult = await chatService.getSessions()
+      const sessionsResult = await this.chatService.getSessions()
       if (!this.isGenerationActive(generation)) return
       if (!sessionsResult.success || !sessionsResult.sessions) {
         retryNeeded = true
@@ -248,7 +262,7 @@ export class MessagePushService extends EventEmitter {
         }
         if (!this.isGenerationActive(generation)) return
         if (result.success) {
-          this.updateInspectedBaseline(session, previous)
+          this.updateBaseline(session, previous)
         } else {
           retryNeeded = true
         }
@@ -258,7 +272,7 @@ export class MessagePushService extends EventEmitter {
         if (!this.isGenerationActive(generation)) return
         const sessionId = String(session.username || '').trim()
         if (!sessionId || candidates.some(c => c.username === sessionId)) continue
-        this.updateObservedBaseline(session, previousBaseline.get(sessionId))
+        this.updateBaseline(session, previousBaseline.get(sessionId))
       }
     } finally {
       this.processing = false
@@ -305,24 +319,12 @@ export class MessagePushService extends EventEmitter {
     return shouldInspectSession(previous, this.sessionTimestamp(session), this.sessionUnread(session))
   }
 
-  private updateObservedBaseline(session: ChatSession, previous: SessionBaseline | undefined): void {
+  /** 已检查/已观察的会话回写基线（两种场景原本实现完全相同） */
+  private updateBaseline(session: ChatSession, previous: SessionBaseline | undefined): void {
     const username = String(session.username || '').trim()
     if (!username) return
-    const sessionTimestamp = this.sessionTimestamp(session)
-    const previousTimestamp = Number(previous?.lastTimestamp || 0)
     this.sessionBaseline.set(username, {
-      lastTimestamp: Math.max(sessionTimestamp, previousTimestamp),
-      unreadCount: this.sessionUnread(session)
-    })
-  }
-
-  private updateInspectedBaseline(session: ChatSession, previous: SessionBaseline | undefined): void {
-    const username = String(session.username || '').trim()
-    if (!username) return
-    const sessionTimestamp = this.sessionTimestamp(session)
-    const previousTimestamp = Number(previous?.lastTimestamp || 0)
-    this.sessionBaseline.set(username, {
-      lastTimestamp: Math.max(sessionTimestamp, previousTimestamp),
+      lastTimestamp: Math.max(this.sessionTimestamp(session), Number(previous?.lastTimestamp || 0)),
       unreadCount: this.sessionUnread(session)
     })
   }
@@ -337,7 +339,7 @@ export class MessagePushService extends EventEmitter {
       Math.floor(Date.now() / 1000)
     )
 
-    const newMessagesResult = await chatService.getNewMessages(sessionId, since, 1000)
+    const newMessagesResult = await this.chatService.getNewMessages(sessionId, since, 1000)
     if (!newMessagesResult.success || !Array.isArray(newMessagesResult.messages)) {
       return { pushedCount: 0, success: false }
     }
@@ -351,13 +353,13 @@ export class MessagePushService extends EventEmitter {
     for (const message of fetchedMessages) {
       const messageKey = String(message.messageKey || '').trim()
       if (!messageKey) continue
-      if (this.isSeenMessage(messageKey) || this.isRecentMessage(messageKey)) continue
-      const isRevoke = this.isRevokeSystemMessage(message)
+      if (this.handledMessageKeys.has(messageKey)) continue
+      const isRevoke = isRevokeSystemMessage(message)
       if (normalizeMessageSendState(message.isSend) === 1) {
         handledMessageKeys.add(messageKey)
         continue
       }
-      if (isRevoke && this.isSelfRevokeMessage(message)) {
+      if (isRevoke && isSelfRevokeMessage(message)) {
         handledMessageKeys.add(messageKey)
         continue
       }
@@ -390,13 +392,12 @@ export class MessagePushService extends EventEmitter {
       }
 
       this.emit(payload.event, payload)
-      this.rememberMessageKey(messageKey)
       handledMessageKeys.add(messageKey)
       pushedCount += 1
     }
 
     for (const messageKey of handledMessageKeys) {
-      this.rememberSeenMessageKey(messageKey)
+      this.handledMessageKeys.remember(messageKey)
     }
     return { pushedCount, success: !processingFailed }
   }
@@ -413,14 +414,14 @@ export class MessagePushService extends EventEmitter {
     const createTime = Number(message.createTime || 0)
 
     if (isGroup) {
-      const groupInfo = await chatService.getContactAvatar(sessionId)
+      const groupInfo = await this.chatService.getContactAvatar(sessionId)
       const groupName = groupInfo?.displayName || resolveGroupDisplayName(session) || sessionId
       const sourceName = await this.resolveGroupSourceName(sessionId, message, session)
       const avatarUrl = await this.normalizePushAvatarUrl(session.avatarUrl || groupInfo?.avatarUrl)
       return { event: 'message.new', sessionId, sessionType, rawid, avatarUrl, groupName, sourceName, content, timestamp: createTime }
     }
 
-    const contactInfo = await chatService.getContactAvatar(sessionId)
+    const contactInfo = await this.chatService.getContactAvatar(sessionId)
     const avatarUrl = await this.normalizePushAvatarUrl(session.avatarUrl || contactInfo?.avatarUrl)
     return {
       event: 'message.new',
@@ -434,25 +435,16 @@ export class MessagePushService extends EventEmitter {
     }
   }
 
-  private isRevokeSystemMessage(message: any): boolean {
-    const localType = Number(message.localType || 0)
-    const content = String(message.rawContent || '') + '\n' + String(message.parsedContent || '')
-    if (content.includes('revokemsg') || content.includes('<replacemsg')) return true
-    if (content.includes('撤回了一条消息') || content.includes('尝试撤回此消息')) return true
-    if ((localType === 10000 || localType === 10002) && content.includes('撤回')) return true
-    return false
-  }
-
   private async buildRevokePayload(session: ChatSession, message: any, fetchedMessages: any[]): Promise<MessagePushPayload | null> {
     const sessionId = String(session.username || '').trim()
     const messageKey = String(message.messageKey || '').trim()
     if (!sessionId || !messageKey) return null
-    if (this.isSelfRevokeMessage(message)) return null
+    if (isSelfRevokeMessage(message)) return null
 
-    const original = this.findRevokedOriginalInMessages(fetchedMessages, message)
+    const original = findRevokedOriginalInMessages(fetchedMessages, message)
     const originalContent = original
       ? getMessageDisplayContent(original)
-      : this.extractReplaceMsg(String(message.rawContent || message.parsedContent || ''))
+      : extractReplaceMsg(String(message.rawContent || message.parsedContent || ''))
 
     const isGroup = sessionId.endsWith('@chatroom')
     const sessionType = this.getSessionType(sessionId, session)
@@ -461,7 +453,7 @@ export class MessagePushService extends EventEmitter {
     const content = '对方撤回了一条消息，内容为「' + safeContent + '」'
 
     if (isGroup) {
-      const groupInfo = await chatService.getContactAvatar(sessionId)
+      const groupInfo = await this.chatService.getContactAvatar(sessionId)
       const groupName = groupInfo?.displayName || resolveGroupDisplayName(session) || sessionId
       const sourceName = original?.senderUsername
         ? await this.resolveGroupSourceName(sessionId, original, session)
@@ -470,7 +462,7 @@ export class MessagePushService extends EventEmitter {
       return { event: 'message.revoke', sessionId, sessionType, rawid: String(message.serverIdRaw || ''), avatarUrl, groupName, sourceName, content, timestamp: createTime }
     }
 
-    const contactInfo = await chatService.getContactAvatar(sessionId)
+    const contactInfo = await this.chatService.getContactAvatar(sessionId)
     const avatarUrl = await this.normalizePushAvatarUrl(session.avatarUrl || contactInfo?.avatarUrl)
     return {
       event: 'message.revoke',
@@ -484,33 +476,6 @@ export class MessagePushService extends EventEmitter {
     }
   }
 
-  private findRevokedOriginalInMessages(messages: any[], revokeMessage: any): any | null {
-    const revokeCreateTime = Number(revokeMessage.createTime || 0)
-    let best: any | null = null
-    for (const message of messages) {
-      if (message.messageKey === revokeMessage.messageKey) continue
-      if (Number(message.isSend) === 1) continue
-      if (this.isRevokeSystemMessage(message)) continue
-      const createTime = Number(message.createTime || 0)
-      if (revokeCreateTime > 0 && createTime > revokeCreateTime) continue
-      if (!best || createTime >= Number(best.createTime || 0)) best = message
-    }
-    return best
-  }
-
-  private extractReplaceMsg(content: string): string | null {
-    const match = /<replacemsg><!\[CDATA\[([\s\S]*?)\]\]><\/replacemsg>/i.exec(content)
-    if (match) return match[1].trim()
-    const plain = /<replacemsg>([\s\S]*?)<\/replacemsg>/i.exec(content)
-    if (plain) return plain[1].trim()
-    return null
-  }
-
-  private isSelfRevokeMessage(message: any): boolean {
-    const content = String(message.rawContent || '') + '\n' + String(message.parsedContent || '')
-    return content.includes('你撤回')
-  }
-
   private async resolveGroupSourceName(chatroomId: string, message: any, session: ChatSession): Promise<string> {
     const senderUsername = String(message.senderUsername || '').trim()
     if (!senderUsername) return this.sessionDisplayName(session) || '未知发送者'
@@ -520,7 +485,7 @@ export class MessagePushService extends EventEmitter {
     const nickname = groupNicknames[senderKey]
     if (nickname) return nickname
 
-    const contactInfo = await chatService.getContactAvatar(senderUsername)
+    const contactInfo = await this.chatService.getContactAvatar(senderUsername)
     return contactInfo?.displayName || senderUsername
   }
 
@@ -531,7 +496,7 @@ export class MessagePushService extends EventEmitter {
     if (cached && Date.now() - cached.updatedAt < this.groupNicknameCacheTtlMs) {
       return cached.nicknames
     }
-    const nicknames = await chatService.getGroupNicknames(cacheKey)
+    const nicknames = await this.chatService.getGroupNicknames(cacheKey)
     this.groupNicknameCache.set(cacheKey, { nicknames, updatedAt: Date.now() })
     return nicknames
   }
@@ -605,42 +570,6 @@ export class MessagePushService extends EventEmitter {
       normalized.startsWith('message_') ||
       normalized.startsWith('msg_') ||
       normalized.includes('message')
-  }
-
-  private isRecentMessage(messageKey: string): boolean {
-    this.pruneRecentMessageKeys()
-    const timestamp = this.recentMessageKeys.get(messageKey)
-    return typeof timestamp === 'number' && Date.now() - timestamp < this.recentMessageTtlMs
-  }
-
-  private rememberMessageKey(messageKey: string): void {
-    this.recentMessageKeys.set(messageKey, Date.now())
-    this.pruneRecentMessageKeys()
-  }
-
-  private isSeenMessage(messageKey: string): boolean {
-    this.pruneSeenMessageKeys()
-    const timestamp = this.seenMessageKeys.get(messageKey)
-    return typeof timestamp === 'number' && Date.now() - timestamp < this.recentMessageTtlMs
-  }
-
-  private rememberSeenMessageKey(messageKey: string): void {
-    this.seenMessageKeys.set(messageKey, Date.now())
-    this.pruneSeenMessageKeys()
-  }
-
-  private pruneRecentMessageKeys(): void {
-    const now = Date.now()
-    for (const [key, timestamp] of this.recentMessageKeys.entries()) {
-      if (now - timestamp > this.recentMessageTtlMs) this.recentMessageKeys.delete(key)
-    }
-  }
-
-  private pruneSeenMessageKeys(): void {
-    const now = Date.now()
-    for (const [key, timestamp] of this.seenMessageKeys.entries()) {
-      if (now - timestamp > this.recentMessageTtlMs) this.seenMessageKeys.delete(key)
-    }
   }
 }
 

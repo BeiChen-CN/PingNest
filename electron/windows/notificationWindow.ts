@@ -24,6 +24,11 @@ export function setNotificationNavigateHandler(callback: (sessionId: string) => 
   onNotificationNavigate = callback
 }
 
+/** 供广播函数排除通知弹窗（notify-center:update 只发给主窗口） */
+export function getNotificationWindow(): BrowserWindow | null {
+  return notificationWindow && !notificationWindow.isDestroyed() ? notificationWindow : null
+}
+
 export function destroyNotificationWindow(): void {
   lastNotificationData = null
   lastNotificationLayout = null

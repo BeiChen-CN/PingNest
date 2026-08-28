@@ -4,6 +4,7 @@
  * 避免主进程（BrowserWindow/vite 注入等环境）导致 wcdb_init 失败。
  */
 import { wcdbCore } from './services/wcdbCore'
+import { validateReadOnlySql } from './services/wcdb/sqlBuilder'
 
 const parentPort: any = (process as any).parentPort
 if (!parentPort) {
@@ -24,28 +25,6 @@ setInterval(() => { }, 60_000)
 
 function reply(id: number, result: unknown): void {
   parentPort.postMessage({ type: 'result', id, result })
-}
-
-/**
- * SQL 只读白名单校验：仅允许 SELECT 与只读 PRAGMA，禁止任何写操作/多语句。
- * 防止内部 execQuery 出口被滥用（目前仅主进程内部使用，加双重保险）。
- */
-function validateReadOnlySql(sql: string): string | null {
-  const raw = String(sql || '')
-  if (!raw.trim()) return 'SQL 为空'
-  // 写关键字（含字符串字面量外的部分）
-  const outsideStrings = raw.replace(/'[^']*'/g, "''").replace(/"([^"]*)"/g, '""')
-  if (/\b(insert|update|delete|drop|alter|create|replace|attach|detach|vacuum|reindex)\b/i.test(outsideStrings)) {
-    return '仅允许只读 SELECT 查询'
-  }
-  const trimmed = raw.trim().toLowerCase()
-  if (!trimmed.startsWith('select ') && !trimmed.startsWith('pragma ')) {
-    return '仅允许 SELECT 或只读 PRAGMA'
-  }
-  if (/pragma\s+(journal_mode|wal_checkpoint|synchronous|locking_mode|page_size|encryption|temp_store|foreign_keys|user_version)/i.test(raw)) {
-    return '该 PRAGMA 会修改数据库状态，已禁止'
-  }
-  return null
 }
 
 parentPort.on('message', (e: any) => {

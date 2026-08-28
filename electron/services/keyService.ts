@@ -1,10 +1,7 @@
 import { join } from 'path'
 import { existsSync, copyFileSync, mkdirSync } from 'fs'
-import { execFile } from 'child_process'
-import { promisify } from 'util'
 import os from 'os'
-
-const execFileAsync = promisify(execFile)
+import { WeChatProcessFinder } from './key/processFinder'
 
 export type DbKeyResult = { success: boolean; key?: string; error?: string; logs?: string[] }
 
@@ -13,8 +10,11 @@ export type DbKeyResult = { success: boolean; key?: string; error?: string; logs
  *
  * 原理：加载 wx_key.dll，注入微信进程 Hook 其数据库初始化回调，
  * 通过 PollKeyData 轮询得到 64 位 hex 密钥，用于解密微信 4.0 本地 wcdb 数据库。
+ * 进程/窗口发现见 key/processFinder，Win32 绑定见 key/win32Api。
  */
 export class KeyService {
+  private readonly processFinder = new WeChatProcessFinder()
+
   private koffi: any = null
   private lib: any = null
   private initialized = false
@@ -23,26 +23,6 @@ export class KeyService {
   private getStatusMessage: any = null
   private cleanupHook: any = null
   private getLastErrorMsg: any = null
-
-  // Win32 APIs
-  private kernel32: any = null
-  private user32: any = null
-
-  private OpenProcess: any = null
-  private CloseHandle: any = null
-  private QueryFullProcessImageNameW: any = null
-
-  private EnumWindows: any = null
-  private GetWindowTextW: any = null
-  private GetWindowTextLengthW: any = null
-  private GetClassNameW: any = null
-  private GetWindowThreadProcessId: any = null
-  private IsWindowVisible: any = null
-  private IsIconic: any = null
-  private ShowWindow: any = null
-  private SetForegroundWindow: any = null
-  private EnumChildWindows: any = null
-  private WNDENUMPROC_PTR: any = null
 
   private getDllPath(): string {
     const isPackaged = process.env.APP_IS_PACKAGED === 'true'
@@ -108,52 +88,6 @@ export class KeyService {
     }
   }
 
-  private ensureWin32(): boolean {
-    return process.platform === 'win32'
-  }
-
-  private ensureKernel32(): boolean {
-    if (this.kernel32) return true
-    try {
-      this.koffi = require('koffi')
-      this.kernel32 = this.koffi.load('kernel32.dll')
-      this.OpenProcess = this.kernel32.func('OpenProcess', 'void*', ['uint32', 'bool', 'uint32'])
-      this.CloseHandle = this.kernel32.func('CloseHandle', 'bool', ['void*'])
-      this.QueryFullProcessImageNameW = this.kernel32.func('QueryFullProcessImageNameW', 'bool', ['void*', 'uint32', this.koffi.out('uint16*'), this.koffi.out('uint32*')])
-      return true
-    } catch (e) {
-      console.error('[KeyService] kernel32 初始化失败:', e)
-      return false
-    }
-  }
-
-  private ensureUser32(): boolean {
-    if (this.user32) return true
-    try {
-      this.koffi = require('koffi')
-      this.user32 = this.koffi.load('user32.dll')
-
-      const WNDENUMPROC = this.koffi.proto('bool __stdcall (void *hWnd, intptr_t lParam)')
-      this.WNDENUMPROC_PTR = this.koffi.pointer(WNDENUMPROC)
-
-      this.EnumWindows = this.user32.func('EnumWindows', 'bool', [this.WNDENUMPROC_PTR, 'intptr_t'])
-      this.EnumChildWindows = this.user32.func('EnumChildWindows', 'bool', ['void*', this.WNDENUMPROC_PTR, 'intptr_t'])
-      this.GetWindowTextW = this.user32.func('GetWindowTextW', 'int', ['void*', this.koffi.out('uint16*'), 'int'])
-      this.GetWindowTextLengthW = this.user32.func('GetWindowTextLengthW', 'int', ['void*'])
-      this.GetClassNameW = this.user32.func('GetClassNameW', 'int', ['void*', this.koffi.out('uint16*'), 'int'])
-      this.GetWindowThreadProcessId = this.user32.func('GetWindowThreadProcessId', 'uint32', ['void*', this.koffi.out('uint32*')])
-      this.IsWindowVisible = this.user32.func('IsWindowVisible', 'bool', ['void*'])
-      this.IsIconic = this.user32.func('IsIconic', 'bool', ['void*'])
-      this.ShowWindow = this.user32.func('ShowWindow', 'bool', ['void*', 'int'])
-      this.SetForegroundWindow = this.user32.func('SetForegroundWindow', 'bool', ['void*'])
-
-      return true
-    } catch (e) {
-      console.error('[KeyService] user32 初始化失败:', e)
-      return false
-    }
-  }
-
   private decodeUtf8(buf: Buffer): string {
     const nullIdx = buf.indexOf(0)
     return buf.toString('utf8', 0, nullIdx > -1 ? nullIdx : undefined).trim()
@@ -168,241 +102,14 @@ export class KeyService {
     }
   }
 
-  private async findPidByImageName(imageName: string): Promise<number | null> {
-    try {
-      const { stdout } = await execFileAsync('tasklist', ['/FI', 'IMAGENAME eq ' + imageName, '/FO', 'CSV', '/NH'])
-      const lines = stdout.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
-      for (const line of lines) {
-        if (line.startsWith('INFO:')) continue
-        const parts = line.split('","').map(p => p.replace(/^"|"$/g, ''))
-        if (parts[0]?.toLowerCase() === imageName.toLowerCase()) {
-          const pid = Number(parts[1])
-          if (!Number.isNaN(pid)) return pid
-        }
-      }
-      return null
-    } catch {
-      return null
-    }
-  }
-
-  /** 查找微信进程 PID（微信 4.0 为 Weixin.exe） */
+  /** 查找微信进程 PID（委托进程发现模块） */
   async findWeChatPid(waitMs = 5000): Promise<number | null> {
-    const names = ['Weixin.exe', 'WeChat.exe']
-    for (const name of names) {
-      const pid = await this.findPidByImageName(name)
-      if (pid) return pid
-    }
-    if (waitMs <= 0) return null
-    const fallbackPid = await this.waitForWeChatWindow(waitMs)
-    return fallbackPid ?? null
+    return this.processFinder.findWeChatPid(waitMs)
   }
 
-  private isWeChatWindowTitle(title: string): boolean {
-    const normalized = title.trim()
-    if (!normalized) return false
-    const lower = normalized.toLowerCase()
-    return normalized === '微信' || lower === 'wechat' || lower === 'weixin'
-  }
-
-  /**
-   * 激活已运行的微信主窗口，供通知点击使用。
-   *
-   * 微信不同版本的主窗口标题可能短暂变化，因此优先使用运行进程
-   * PID 识别窗口；只有无法取得 PID 时才退回到标题识别。
-   */
+  /** 激活已运行的微信主窗口（委托进程发现模块） */
   async focusWeChatWindow(): Promise<boolean> {
-    if (!this.ensureWin32() || !this.ensureUser32()) return false
-
-    let preferredPid: number | null = null
-    try {
-      preferredPid = await this.findWeChatPid(0)
-    } catch { }
-
-    const candidates: Array<{ hWnd: any; pid: number }> = []
-    const enumWindowsCallback = this.koffi.register((hWnd: any) => {
-      if (!this.IsWindowVisible(hWnd)) return true
-
-      const pidBuf = Buffer.alloc(4)
-      this.GetWindowThreadProcessId(hWnd, pidBuf)
-      const pid = pidBuf.readUInt32LE(0)
-      if (!pid) return true
-
-      // 已确认微信进程时，不再依赖窗口标题。窗口标题可能是空值，
-      // 或在登录、切换页面时暂时显示为其他文本。
-      if (preferredPid !== null) {
-        if (pid === preferredPid) candidates.push({ hWnd, pid })
-        return true
-      }
-
-      if (this.isWeChatWindowTitle(this.getWindowTitle(hWnd))) candidates.push({ hWnd, pid })
-      return true
-    }, this.WNDENUMPROC_PTR)
-
-    try {
-      this.EnumWindows(enumWindowsCallback, 0)
-    } finally {
-      this.koffi.unregister(enumWindowsCallback)
-    }
-
-    const target = candidates.find((candidate) => candidate.pid === preferredPid) || candidates[0]
-    if (!target) return false
-
-    try {
-      if (this.IsIconic(target.hWnd)) this.ShowWindow(target.hWnd, 9)
-      return !!this.SetForegroundWindow(target.hWnd)
-    } catch (error) {
-      console.warn('[KeyService] 激活微信窗口失败:', error)
-      return false
-    }
-  }
-
-  private getWindowTitle(hWnd: any): string {
-    const len = this.GetWindowTextLengthW(hWnd)
-    if (len === 0) return ''
-    const buf = Buffer.alloc((len + 1) * 2)
-    this.GetWindowTextW(hWnd, buf, len + 1)
-    return buf.toString('ucs2', 0, len * 2)
-  }
-
-  private getClassName(hWnd: any): string {
-    const buf = Buffer.alloc(512)
-    const len = this.GetClassNameW(hWnd, buf, 256)
-    return buf.toString('ucs2', 0, len * 2)
-  }
-
-  private async waitForWeChatWindow(timeoutMs = 25000): Promise<number | null> {
-    if (!this.ensureUser32()) return null
-    const startTime = Date.now()
-    while (Date.now() - startTime < timeoutMs) {
-      let foundPid: number | null = null
-      const enumWindowsCallback = this.koffi.register((hWnd: any) => {
-        if (!this.IsWindowVisible(hWnd)) return true
-        if (!this.isWeChatWindowTitle(this.getWindowTitle(hWnd))) return true
-        const pidBuf = Buffer.alloc(4)
-        this.GetWindowThreadProcessId(hWnd, pidBuf)
-        const pid = pidBuf.readUInt32LE(0)
-        if (pid) {
-          foundPid = pid
-          return false
-        }
-        return true
-      }, this.WNDENUMPROC_PTR)
-
-      this.EnumWindows(enumWindowsCallback, 0)
-      this.koffi.unregister(enumWindowsCallback)
-
-      if (foundPid) return foundPid
-      await new Promise(r => setTimeout(r, 500))
-    }
-    return null
-  }
-
-  private collectChildWindowInfos(parent: any): Array<{ title: string; className: string }> {
-    const children: Array<{ title: string; className: string }> = []
-    const enumChildCallback = this.koffi.register((hChild: any) => {
-      children.push({ title: this.getWindowTitle(hChild).trim(), className: this.getClassName(hChild).trim() })
-      return true
-    }, this.WNDENUMPROC_PTR)
-    this.EnumChildWindows(parent, enumChildCallback, 0)
-    this.koffi.unregister(enumChildCallback)
-    return children
-  }
-
-  private hasReadyComponents(children: Array<{ title: string; className: string }>): boolean {
-    if (children.length === 0) return false
-    const readyTexts = ['聊天', '登录', '账号']
-    const readyClassMarkers = ['WeChat', 'Weixin', 'TXGuiFoundation', 'Qt5', 'ChatList', 'MainWnd', 'BrowserWnd', 'ListView']
-    const readyChildCountThreshold = 14
-
-    let classMatchCount = 0
-    let titleMatchCount = 0
-    let hasValidClassName = false
-
-    for (const child of children) {
-      const normalizedTitle = child.title.replace(/\s+/g, '')
-      if (normalizedTitle) {
-        if (readyTexts.some(marker => normalizedTitle.includes(marker))) return true
-        titleMatchCount += 1
-      }
-      if (child.className) {
-        if (readyClassMarkers.some(marker => child.className.includes(marker))) return true
-        if (child.className.length > 5) {
-          classMatchCount += 1
-          hasValidClassName = true
-        }
-      }
-    }
-    if (classMatchCount >= 3 || titleMatchCount >= 2) return true
-    if (children.length >= readyChildCountThreshold) return true
-    if (hasValidClassName && children.length >= 5) return true
-    return false
-  }
-
-  private isLoginRelatedText(value: string): boolean {
-    const normalized = String(value || '').replace(/\s+/g, '').toLowerCase()
-    if (!normalized) return false
-    const keywords = ['登录', '扫码', '二维码', '请在手机上确认', '手机确认', '切换账号', 'wechatlogin', 'qrcode', 'scan']
-    return keywords.some(keyword => normalized.includes(keyword))
-  }
-
-  private async detectWeChatLoginRequired(pid: number): Promise<boolean> {
-    if (!this.ensureUser32()) return false
-    let loginRequired = false
-    const enumWindowsCallback = this.koffi.register((hWnd: any) => {
-      if (!this.IsWindowVisible(hWnd)) return true
-      const title = this.getWindowTitle(hWnd)
-      if (!this.isWeChatWindowTitle(title)) return true
-
-      const pidBuf = Buffer.alloc(4)
-      this.GetWindowThreadProcessId(hWnd, pidBuf)
-      if (pidBuf.readUInt32LE(0) !== pid) return true
-
-      if (this.isLoginRelatedText(title)) {
-        loginRequired = true
-        return false
-      }
-      for (const child of this.collectChildWindowInfos(hWnd)) {
-        if (this.isLoginRelatedText(child.title) || this.isLoginRelatedText(child.className)) {
-          loginRequired = true
-          return false
-        }
-      }
-      return true
-    }, this.WNDENUMPROC_PTR)
-
-    this.EnumWindows(enumWindowsCallback, 0)
-    this.koffi.unregister(enumWindowsCallback)
-    return loginRequired
-  }
-
-  private async waitForWeChatWindowComponents(pid: number, timeoutMs = 15000): Promise<boolean> {
-    if (!this.ensureUser32()) return true
-    const startTime = Date.now()
-    while (Date.now() - startTime < timeoutMs) {
-      let ready = false
-      const enumWindowsCallback = this.koffi.register((hWnd: any) => {
-        if (!this.IsWindowVisible(hWnd)) return true
-        if (!this.isWeChatWindowTitle(this.getWindowTitle(hWnd))) return true
-
-        const pidBuf = Buffer.alloc(4)
-        this.GetWindowThreadProcessId(hWnd, pidBuf)
-        if (pidBuf.readUInt32LE(0) !== pid) return true
-
-        if (this.hasReadyComponents(this.collectChildWindowInfos(hWnd))) {
-          ready = true
-          return false
-        }
-        return true
-      }, this.WNDENUMPROC_PTR)
-
-      this.EnumWindows(enumWindowsCallback, 0)
-      this.koffi.unregister(enumWindowsCallback)
-
-      if (ready) return true
-      await new Promise(r => setTimeout(r, 500))
-    }
-    return true
+    return this.processFinder.focusWeChatWindow()
   }
 
   /**
@@ -412,14 +119,13 @@ export class KeyService {
     timeoutMs = 60_000,
     onStatus?: (message: string, level: number) => void
   ): Promise<DbKeyResult> {
-    if (!this.ensureWin32()) return { success: false, error: '仅支持 Windows' }
+    if (process.platform !== 'win32') return { success: false, error: '仅支持 Windows' }
     if (!this.ensureLoaded()) return { success: false, error: 'wx_key.dll 未加载' }
-    if (!this.ensureKernel32()) return { success: false, error: 'Kernel32 Init Failed' }
 
     const logs: string[] = []
 
     onStatus?.('正在查找微信进程...', 0)
-    const pid = await this.findWeChatPid()
+    const pid = await this.processFinder.findWeChatPid()
     if (!pid) {
       const err = '未找到微信进程，请先启动微信'
       onStatus?.(err, 2)
@@ -428,7 +134,7 @@ export class KeyService {
 
     onStatus?.('检测到微信窗口 (PID: ' + pid + ')，正在获取...', 0)
     onStatus?.('正在检测微信界面组件...', 0)
-    await this.waitForWeChatWindowComponents(pid, 15000)
+    await this.processFinder.waitForWeChatWindowComponents(pid, 15000)
 
     let ok = this.initHook(pid)
     if (!ok) {
@@ -441,26 +147,7 @@ export class KeyService {
     if (!ok) {
       const error = this.getLastErrorMsg ? this.decodeCString(this.getLastErrorMsg()) : ''
       if (error) {
-        const normalizedError = error.toLowerCase()
-        if (normalizedError.includes('auth_failed') && normalizedError.includes('auth_env_missing')) {
-          return {
-            success: false,
-            error: '当前 wx_key.dll 需要 WeFlow 授权环境，不能用于 PingNest。请恢复 PingNest 配套的 wx_key.dll。'
-          }
-        }
-        if (error.includes('0xC0000022') || error.includes('ACCESS_DENIED') || error.includes('打开目标进程失败')) {
-          return {
-            success: false,
-            error: '权限不足：无法访问微信进程。\n\n解决方法：\n1. 以管理员身份运行本程序\n2. 关闭可能拦截的安全软件（如360、火绒等）\n3. 确保微信没有以管理员权限运行'
-          }
-        }
-        if (error.includes('已经初始化') || error.toLowerCase().includes('already') || error.includes('重复')) {
-          return {
-            success: false,
-            error: '微信进程内存在未清理的密钥 Hook 状态（之前获取密钥未正常退出）。\n\n解决方法：完全退出微信（任务栏右键 → 退出），重新打开并登录后，再点击"一键配置"重试。'
-          }
-        }
-        return { success: false, error }
+        return this.explainHookError(error)
       }
       const statusBuffer = Buffer.alloc(256)
       const levelOut = [0]
@@ -492,7 +179,7 @@ export class KeyService {
           const level = levelOut[0] ?? 0
           if (msg) {
             logs.push(msg)
-            if (this.isLoginRelatedText(msg)) loginRequiredDetected = true
+            if (this.processFinder.isLoginRelatedText(msg)) loginRequiredDetected = true
             onStatus?.(msg, level)
           }
         }
@@ -502,7 +189,7 @@ export class KeyService {
       try { this.cleanupHook() } catch { }
     }
 
-    const loginRequired = loginRequiredDetected || await this.detectWeChatLoginRequired(pid)
+    const loginRequired = loginRequiredDetected || await this.processFinder.detectWeChatLoginRequired(pid)
     if (loginRequired) {
       return {
         success: false,
@@ -515,6 +202,30 @@ export class KeyService {
       error: '获取密钥超时。若微信已登录，请退出登录并重新登录一次（微信 4.1.11+ 需重新触发密钥生成）。',
       logs
     }
+  }
+
+  /** 把 wx_key.dll 的原始错误翻译为用户可操作指引 */
+  private explainHookError(error: string): DbKeyResult {
+    const normalizedError = error.toLowerCase()
+    if (normalizedError.includes('auth_failed') && normalizedError.includes('auth_env_missing')) {
+      return {
+        success: false,
+        error: '当前 wx_key.dll 需要 WeFlow 授权环境，不能用于 PingNest。请恢复 PingNest 配套的 wx_key.dll。'
+      }
+    }
+    if (error.includes('0xC0000022') || error.includes('ACCESS_DENIED') || error.includes('打开目标进程失败')) {
+      return {
+        success: false,
+        error: '权限不足：无法访问微信进程。\n\n解决方法：\n1. 以管理员身份运行本程序\n2. 关闭可能拦截的安全软件（如360、火绒等）\n3. 确保微信没有以管理员权限运行'
+      }
+    }
+    if (error.includes('已经初始化') || normalizedError.includes('already') || error.includes('重复')) {
+      return {
+        success: false,
+        error: '微信进程内存在未清理的密钥 Hook 状态（之前获取密钥未正常退出）。\n\n解决方法：完全退出微信（任务栏右键 → 退出），重新打开并登录后，再点击"一键配置"重试。'
+      }
+    }
+    return { success: false, error }
   }
 }
 
