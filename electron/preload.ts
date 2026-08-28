@@ -16,7 +16,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getStatus: () => ipcRenderer.invoke('app:getStatus'),
     connect: () => ipcRenderer.invoke('app:connect'),
     reconnect: () => ipcRenderer.invoke('app:reconnect'),
-    autoSetup: () => ipcRenderer.invoke('app:autoSetup'),
     hook: () => ipcRenderer.invoke('app:hook'),
     removeHook: () => ipcRenderer.invoke('app:removeHook'),
     onHookProgress: (callback: (progress: any) => void) => {

@@ -111,10 +111,6 @@ parentPort.on('message', (e: any) => {
           reply(id, await wcdbCore.execQuery(String(payload?.kind || ''), payload?.dbPath ? String(payload.dbPath) : null, sql))
           break
         }
-        case 'getMessages': {
-          reply(id, await wcdbCore.getMessages(String(payload?.sessionId || ''), Number(payload?.limit || 50), Number(payload?.offset || 0)))
-          break
-        }
         case 'startMonitor': {
           const ok = wcdbCore.startMonitor((type, json) => {
             parentPort.postMessage({ type: 'monitor', payload: { type, json } })

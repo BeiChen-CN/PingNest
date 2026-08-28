@@ -27,7 +27,6 @@ export class KeyService {
   // Win32 APIs
   private kernel32: any = null
   private user32: any = null
-  private advapi32: any = null
 
   private OpenProcess: any = null
   private CloseHandle: any = null
@@ -44,15 +43,6 @@ export class KeyService {
   private SetForegroundWindow: any = null
   private EnumChildWindows: any = null
   private WNDENUMPROC_PTR: any = null
-
-  private RegOpenKeyExW: any = null
-  private RegQueryValueExW: any = null
-  private RegCloseKey: any = null
-
-  private readonly KEY_READ = 0x20019
-  private readonly HKEY_LOCAL_MACHINE = 0x80000002
-  private readonly HKEY_CURRENT_USER = 0x80000001
-  private readonly ERROR_SUCCESS = 0
 
   private getDllPath(): string {
     const isPackaged = process.env.APP_IS_PACKAGED === 'true'
@@ -164,26 +154,6 @@ export class KeyService {
     }
   }
 
-  private ensureAdvapi32(): boolean {
-    if (this.advapi32) return true
-    try {
-      this.koffi = require('koffi')
-      this.advapi32 = this.koffi.load('advapi32.dll')
-
-      const HKEY = this.koffi.alias('HKEY', 'intptr_t')
-      const HKEY_PTR = this.koffi.pointer(HKEY)
-
-      this.RegOpenKeyExW = this.advapi32.func('RegOpenKeyExW', 'long', [HKEY, 'uint16*', 'uint32', 'uint32', this.koffi.out(HKEY_PTR)])
-      this.RegQueryValueExW = this.advapi32.func('RegQueryValueExW', 'long', [HKEY, 'uint16*', 'uint32*', this.koffi.out('uint32*'), this.koffi.out('uint8*'), this.koffi.out('uint32*')])
-      this.RegCloseKey = this.advapi32.func('RegCloseKey', 'long', [HKEY])
-
-      return true
-    } catch (e) {
-      console.error('[KeyService] advapi32 初始化失败:', e)
-      return false
-    }
-  }
-
   private decodeUtf8(buf: Buffer): string {
     const nullIdx = buf.indexOf(0)
     return buf.toString('utf8', 0, nullIdx > -1 ? nullIdx : undefined).trim()
@@ -196,109 +166,6 @@ export class KeyService {
     } catch {
       return ''
     }
-  }
-
-  private readRegistryString(rootKey: number, subKey: string, valueName: string): string | null {
-    if (!this.ensureAdvapi32()) return null
-    const subKeyBuf = Buffer.from(subKey + '\0', 'ucs2')
-    const valueNameBuf = valueName ? Buffer.from(valueName + '\0', 'ucs2') : null
-    const phkResult = Buffer.alloc(8)
-
-    if (this.RegOpenKeyExW(rootKey, subKeyBuf, 0, this.KEY_READ, phkResult) !== this.ERROR_SUCCESS) return null
-    const hKey = this.koffi.decode(phkResult, 'uintptr_t')
-
-    try {
-      const lpcbData = Buffer.alloc(4)
-      lpcbData.writeUInt32LE(0, 0)
-      let ret = this.RegQueryValueExW(hKey, valueNameBuf, null, null, null, lpcbData)
-      if (ret !== this.ERROR_SUCCESS) return null
-
-      const size = lpcbData.readUInt32LE(0)
-      if (size === 0) return null
-
-      const dataBuf = Buffer.alloc(size)
-      ret = this.RegQueryValueExW(hKey, valueNameBuf, null, null, dataBuf, lpcbData)
-      if (ret !== this.ERROR_SUCCESS) return null
-
-      let str = dataBuf.toString('ucs2')
-      if (str.endsWith('\0')) str = str.slice(0, -1)
-      return str
-    } finally {
-      this.RegCloseKey(hKey)
-    }
-  }
-
-  private async getProcessExecutablePath(pid: number): Promise<string | null> {
-    if (!this.ensureKernel32()) return null
-    const hProcess = this.OpenProcess(0x1000, false, pid)
-    if (!hProcess) return null
-    try {
-      const sizeBuf = Buffer.alloc(4)
-      sizeBuf.writeUInt32LE(1024, 0)
-      const pathBuf = Buffer.alloc(1024 * 2)
-      const ret = this.QueryFullProcessImageNameW(hProcess, 0, pathBuf, sizeBuf)
-      if (ret) {
-        const len = sizeBuf.readUInt32LE(0)
-        return pathBuf.toString('ucs2', 0, len * 2)
-      }
-      return null
-    } catch {
-      return null
-    } finally {
-      this.CloseHandle(hProcess)
-    }
-  }
-
-  /** 查找微信安装路径（优先运行中的进程，其次注册表/常见路径） */
-  async findWeChatInstallPath(): Promise<string | null> {
-    try {
-      const pid = await this.findWeChatPid()
-      if (pid) {
-        const runPath = await this.getProcessExecutablePath(pid)
-        if (runPath && existsSync(runPath)) return runPath
-      }
-    } catch { }
-
-    const uninstallKeys = [
-      'SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall',
-      'SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall'
-    ]
-    const roots = [this.HKEY_LOCAL_MACHINE, this.HKEY_CURRENT_USER]
-    const tencentKeys = [
-      'Software\\Tencent\\WeChat',
-      'Software\\WOW6432Node\\Tencent\\WeChat',
-      'Software\\Tencent\\Weixin'
-    ]
-
-    for (const root of roots) {
-      for (const key of tencentKeys) {
-        const path = this.readRegistryString(root, key, 'InstallPath')
-        if (path && existsSync(join(path, 'Weixin.exe'))) return join(path, 'Weixin.exe')
-        if (path && existsSync(join(path, 'WeChat.exe'))) return join(path, 'WeChat.exe')
-      }
-    }
-
-    for (const root of roots) {
-      for (const parent of uninstallKeys) {
-        const path = this.readRegistryString(root, parent + '\\WeChat', 'InstallLocation')
-        if (path && existsSync(join(path, 'Weixin.exe'))) return join(path, 'Weixin.exe')
-      }
-    }
-
-    const drives = ['C', 'D', 'E', 'F']
-    const commonPaths = [
-      'Program Files\\Tencent\\WeChat\\WeChat.exe',
-      'Program Files (x86)\\Tencent\\WeChat\\WeChat.exe',
-      'Program Files\\Tencent\\Weixin\\Weixin.exe',
-      'Program Files (x86)\\Tencent\\Weixin\\Weixin.exe'
-    ]
-    for (const drive of drives) {
-      for (const p of commonPaths) {
-        const full = join(drive + ':', p)
-        if (existsSync(full)) return full
-      }
-    }
-    return null
   }
 
   private async findPidByImageName(imageName: string): Promise<number | null> {

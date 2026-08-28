@@ -16,7 +16,6 @@ declare global {
         getStatus: () => Promise<AppStatus>
       connect: () => Promise<{ success: boolean; error?: string }>
       reconnect: () => Promise<{ success: boolean; error?: string }>
-        autoSetup: () => Promise<{ success: boolean; error?: string; steps?: string[] }>
         hook: () => Promise<{ success: boolean; error?: string; account?: string }>
         removeHook: () => Promise<{ success: boolean; error?: string }>
         onHookProgress: (callback: (progress: HookProgress) => void) => (() => void) | undefined

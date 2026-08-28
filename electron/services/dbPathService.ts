@@ -206,27 +206,6 @@ export class DbPathService {
     }
     return sorted
   }
-
-  /** 获取默认数据库路径（Windows: Documents/xwechat_files） */
-  getDefaultPath(): string {
-    const home = homedir()
-    if (process.platform === 'darwin') {
-      const appSupportBase = join(home, 'Library', 'Containers', 'com.tencent.xinWeChat', 'Data', 'Library', 'Application Support', 'com.tencent.xinWeChat')
-      if (existsSync(appSupportBase)) {
-        try {
-          const entries = readdirSync(appSupportBase)
-          for (const entry of entries) {
-            if (/^\d+\.\d+b\d+\.\d+/.test(entry) || /^\d+\.\d+\.\d+/.test(entry)) {
-              const candidate = join(appSupportBase, entry)
-              if (existsSync(candidate)) return candidate
-            }
-          }
-        } catch { }
-      }
-      return join(home, 'Library', 'Containers', 'com.tencent.xinWeChat', 'Data', 'Documents', 'xwechat_files')
-    }
-    return join(home, 'Documents', 'xwechat_files')
-  }
 }
 
 export const dbPathService = new DbPathService()

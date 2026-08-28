@@ -127,27 +127,6 @@ export function useDashboardData(onNavigateToSession: (sessionId: string, entrie
     }
   }
 
-  const runAutoSetup = async () => {
-    setBusy(true)
-    try {
-      const result = await window.electronAPI?.app.autoSetup()
-      if (result && !result.success) {
-        const message = result.error || '自动配置失败'
-        setErrorMessage(message)
-        toast(message, 'error')
-      } else if (result?.success) {
-        toast('微信连接成功', 'success')
-      }
-    } catch (error) {
-      const message = '自动配置失败：' + String(error)
-      setErrorMessage(message)
-      toast(message, 'error')
-    } finally {
-      setBusy(false)
-      void refresh()
-    }
-  }
-
   const reconnect = async () => {
     if (!window.electronAPI) return false
     setBusy(true)
@@ -293,6 +272,6 @@ export function useDashboardData(onNavigateToSession: (sessionId: string, entrie
 
   return {
     status, config, entries, busy, checking, hookBusy, hookProgress, lastStatusAt, errorMessage,
-    setErrorMessage, refresh, checkNow, saveConfig, runAutoSetup, reconnect, rehook, removeHook, markEntryRead, markSessionRead, removeEntry, clearEntries
+    setErrorMessage, refresh, checkNow, saveConfig, reconnect, rehook, removeHook, markEntryRead, markSessionRead, removeEntry, clearEntries
   }
 }

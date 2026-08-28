@@ -471,10 +471,6 @@ function registerIpcHandlers(): void {
     return reconnectAndStart()
   })
 
-  ipcMain.handle('app:autoSetup', async () => {
-    return hookAndConnect()
-  })
-
   ipcMain.handle('app:hook', async (event) => {
     return hookAndConnect((progress) => event.sender.send('app:hookProgress', progress))
   })

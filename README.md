@@ -133,8 +133,7 @@ src/
 |-- components/                     桌面通知组件
 |-- features/dashboard/             概览、历史、静音、外观、设置和关于页面
 |-- pages/                          应用页面与通知窗口页面
-|-- styles/                         全局设计 token 与动效
-`-- themes/                         通知主题定义
+`-- styles/                         全局设计 token 与动效
 
 resources/                         微信密钥、WCDB 和 Windows 运行时 DLL
 tests/                             消息、历史分组、名称解析和布局测试

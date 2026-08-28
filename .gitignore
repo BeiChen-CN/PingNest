@@ -7,3 +7,4 @@ logs/
 *.tsbuildinfo
 *.log
 .DS_Store
+.zcode/

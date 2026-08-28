@@ -9,16 +9,17 @@ interface Props {
   entries: NotifyCenterEntry[]
   rules: NotifyRule[]
   busy: boolean
+  connecting: boolean
   checking: boolean
   lastStatusAt: number | null
   onOpenHistory: (id?: string) => void
   onRefresh: () => Promise<boolean>
-  onAutoSetup: () => void
+  onConnect: () => void
   onReconnect: () => void
   onToggleNotifications: (enabled: boolean) => void
 }
 
-export function OverviewPage({ status, config, entries, rules, busy, checking, lastStatusAt, onOpenHistory, onRefresh, onAutoSetup, onReconnect, onToggleNotifications }: Props) {
+export function OverviewPage({ status, config, entries, rules, busy, connecting, checking, lastStatusAt, onOpenHistory, onRefresh, onConnect, onReconnect, onToggleNotifications }: Props) {
   const todayCount = entries.filter((entry) => new Date(entry.receivedAt).toDateString() === new Date().toDateString()).length
   const healthy = status.connected && status.wcdbReady
   const connectionLabel = !status.hasFullConfig ? '未配置' : !status.wechatRunning ? '等待微信' : healthy ? '监听中' : '连接中断'
@@ -33,7 +34,7 @@ export function OverviewPage({ status, config, entries, rules, busy, checking, l
       <aside className="overview-side-stack"><section className="surface runtime-surface"><div className="overview-section-head compact"><div><span className="section-kicker">SYSTEM</span><h3>运行状态</h3></div><span className={'mini-state' + (healthy ? ' good' : '')}><i />{healthy ? '正常' : '检查中'}</span></div><dl><div><dt>微信进程</dt><dd>{status.wechatRunning ? '已运行' : '未运行'}</dd></div><div><dt>微信连接</dt><dd>{status.wcdbReady ? '就绪' : '不可用'}</dd></div><div><dt>状态更新</dt><dd>{lastStatusAt ? new Date(lastStatusAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '等待检查'}</dd></div><div><dt>自动重连</dt><dd>{config.autoReconnect ? `${config.reconnectIntervalSeconds} 秒` : '关闭'}</dd></div></dl><button className="button full" disabled={checking} onClick={() => void onRefresh()}><RefreshCw size={13} className={checking ? 'spin' : ''} />{checking ? '正在检查' : '检查连接'}</button></section><section className="surface overview-privacy"><ShieldCheck size={16} /><div><b>本地数据保护</b><span>通知内容只保存在本机。</span></div></section></aside>
     </div>
 
-    {!status.hasFullConfig && <section className="connection-callout"><Database size={20} /><div><b>连接微信</b><span>请先启动并登录微信。</span></div><button className="button primary" disabled={busy} onClick={onAutoSetup}>{busy ? '正在连接' : '开始连接'}</button></section>}
+    {!status.hasFullConfig && <section className="connection-callout"><Database size={20} /><div><b>连接微信</b><span>请先启动并登录微信。</span></div><button className="button primary" disabled={connecting} onClick={onConnect}>{connecting ? '正在连接' : '开始连接'}</button></section>}
     {status.hasFullConfig && !healthy && <section className="connection-callout warning"><Database size={20} /><div><b>{status.wechatRunning ? '消息监听已中断' : '等待微信启动'}</b><span>{status.wechatRunning ? '请重新连接微信。' : '启动并登录微信后再连接。'}</span></div><button className="button primary" disabled={busy || !status.wechatRunning} onClick={onReconnect}>{busy ? '正在连接' : '重新连接'}</button></section>}
   </section>
 }

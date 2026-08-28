@@ -144,10 +144,6 @@ export class DbWorkerClient {
     return this.call('execQuery', { kind, dbPath, sql })
   }
 
-  getMessages(sessionId: string, limit: number, offset: number): Promise<{ success: boolean; messages?: any[]; error?: string }> {
-    return this.call('getMessages', { sessionId, limit, offset })
-  }
-
   addMonitorListener(listener: (type: string, json: string) => void): () => void {
     this.monitorListeners.add(listener)
     return () => { this.monitorListeners.delete(listener) }

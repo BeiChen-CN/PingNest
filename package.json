@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "PingNest",
   "main": "dist-electron/main.js",
+  "engines": {
+    "node": ">=22"
+  },
   "author": {
     "name": "PingNest"
   },
