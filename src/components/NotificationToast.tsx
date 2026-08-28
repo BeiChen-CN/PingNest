@@ -121,7 +121,7 @@ export function NotificationToast({
 
   const isRevoke = data.event === 'message.revoke'
   const isClickable = data.clickBehavior !== 'none'
-  const accentColor = /^#[0-9a-f]{6}$/i.test(data.accentColor || '') ? data.accentColor : '#20a866'
+  const accentColor = /^#[0-9a-f]{6}$/i.test(data.accentColor || '') ? data.accentColor : '#006a6a'
   const progressKey = `${data.id}-${data.receivedAtMs || data.timestamp}`
   const accessibleLabel = isRevoke
     ? `${data.title} 撤回了一条消息`

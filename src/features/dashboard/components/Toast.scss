@@ -1,40 +1,48 @@
+// Snackbar 风格的操作反馈（MD3）：深色浮层 + 彩色状态图标。
 @use '../../../styles/tokens' as *;
 @use '../../../styles/motion' as *;
 
 .toast-host {
   position: fixed;
-  right: 20px;
-  bottom: 20px;
+  right: 22px;
+  bottom: 18px;
   z-index: 2000;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: $space-2;
   pointer-events: none;
 }
 
 .toast-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: $space-2;
   min-width: 220px;
   max-width: 340px;
-  padding: 9px 10px 9px 12px;
-  color: $text;
-  background: $surface;
-  border: 1px solid $border;
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(21, 45, 32, 0.08);
-  font-size: 12px;
+  min-height: 46px;
+  padding: 0 $space-3 0 $space-4;
+  color: #ffffff;
+  background: #2d312f;
+  border-radius: $radius-xs;
+  box-shadow: $elevation-3;
+  font-size: $font-size-sm;
   line-height: 1.4;
   pointer-events: auto;
   animation: motion-fade-up $motion-duration-base $motion-ease-out both;
 
-  &.success svg { color: $green; }
-  &.error svg { color: $danger; }
-  &.info svg { color: $muted; }
+  &.success svg { color: #7eddb2; }
+  &.error svg { color: #ffb4ab; }
+  &.info svg { color: #c8e7f5; }
 
   span { flex: 1; min-width: 0; }
-  .icon-button { flex: 0 0 auto; width: 20px; height: 20px; border: 0; border-radius: 4px; display: grid; place-items: center; color: $muted; background: transparent; cursor: pointer; &:hover { background: $surface-hover; color: $text; } }
+
+  .icon-button {
+    flex: 0 0 auto;
+    width: 24px;
+    height: 24px;
+    color: rgba(255, 255, 255, .7);
+    &:hover { background: rgba(255, 255, 255, .12); color: #fff; }
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

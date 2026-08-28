@@ -1,7 +1,6 @@
 import { Fragment, useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, CalendarDays, Check, Copy, Inbox, Search, Trash2, Users, X } from 'lucide-react'
 import { Avatar, formatTime } from '../components/Avatar'
-import { SelectField } from '../components/SelectField'
 import { groupHistoryEntries, historyConversationId, historyMessageTime, normalizeHistorySessionType } from '../historyGrouping'
 import { toast } from '../stores/toastStore'
 import type { NotifyCenterEntry } from '../types'
@@ -101,17 +100,24 @@ export function HistoryPage({ entries, selectedId, onSelect, onRequestRemove, on
   }
 
   return <section className={'history-page page-body' + (mobileDetailOpen ? ' mobile-detail-open' : '')}>
-    <div className="history-intro"><div><span className="history-eyebrow">NOTIFICATION ARCHIVE</span><h2>通知历史</h2><p>按会话整理的本地通知记录。</p></div><div className="history-total"><b>{entries.length}</b><span>条记录</span></div></div>
-    <div className="history-toolbar history-toolbar-redesigned">
-      <label className="search-field"><Search size={14} /><input aria-label="搜索历史通知" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索联系人、群聊或消息" />{query && <button type="button" onClick={() => setQuery('')} aria-label="清除搜索" title="清除搜索"><X size={13} /></button>}</label>
+    <div className="page-tools">
+      <label className="search-bar">
+        <Search size={16} />
+        <input aria-label="搜索历史通知" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索联系人、群聊或消息" />
+        {query && <button type="button" className="icon-button" onClick={() => setQuery('')} aria-label="清除搜索" title="清除搜索"><X size={13} /></button>}
+      </label>
+      <div className="chip-row" role="group" aria-label="按消息类型筛选">
+        {[{ value: 'all', label: '全部' }, { value: 'private', label: '私聊' }, { value: 'group', label: '群聊' }, { value: 'official', label: '公众号' }, { value: 'other', label: '其他' }].map((option) => (
+          <button key={option.value} type="button" className={'chip' + (typeFilter === option.value ? ' active' : '')} aria-pressed={typeFilter === option.value} onClick={() => setTypeFilter(option.value)}>{option.label}</button>
+        ))}
+      </div>
       <label className={'history-date-field' + (dateFilter !== 'all' ? ' has-value' : '')}>
         <CalendarDays size={14} aria-hidden="true" />
         <input type="date" aria-label="选择日期" value={dateFilter === 'all' ? '' : dateFilter} onChange={(event) => setDateFilter(event.target.value || 'all')} />
         {dateFilter !== 'all' && <button type="button" onClick={() => setDateFilter('all')} aria-label="清除日期筛选" title="清除日期筛选"><X size={13} /></button>}
       </label>
-      <SelectField label="消息类型" value={typeFilter} options={[{ value: 'all', label: '全部' }, { value: 'private', label: '私聊' }, { value: 'group', label: '群聊' }, { value: 'official', label: '公众号' }, { value: 'other', label: '其他' }]} onChange={setTypeFilter} />
       <span className="history-result-count" aria-live="polite">{conversations.length} 个会话 · {conversations.reduce((count, conversation) => count + conversation.entries.length, 0)} 条</span>
-      <button className="button danger-ghost" disabled={!entries.length} onClick={onRequestClear}><Trash2 size={13} />清空全部</button>
+      <button className="md-button outlined danger-action" disabled={!entries.length} onClick={onRequestClear}><Trash2 size={14} />清空全部</button>
     </div>
 
     <div className="history-layout">

@@ -1,29 +1,95 @@
-// PingNest 设计 token（对应 Figma 规范与 WPF-UI-SPEC）
-// 主色系统
-$app-bg: #F6F8F7;          // 应用背景
-$surface: #FFFFFF;         // 主内容背景
-$select-green: #E8F7EE;    // 淡绿选中背景
-$hover-green: #F0FAF4;     // 淡绿悬停背景
-$green: #20A866;           // 主操作绿
-$text: #18211D;            // 深色正文
-$muted: #66736C;           // 次级文字
-$border: #E3EAE6;          // 弱边框
-$warn: #D98B27;            // 警告色
-$danger: #D9534F;          // 错误色
+// PingNest 设计 token —— MD3「分层工作台」方案（视觉基准：public/md3-prototypes.html theme-b）
+// 颜色以 CSS 自定义属性暴露（运行时可换肤，如未来 data-theme 暗色），
+// 布局/间距/圆角/字阶用 SCSS 变量在编译期使用。
 
-// 兼容旧变量名
-$bg: $app-bg;
-$green-soft: $select-green;
-$green-hover: $hover-green;
+// ---------- MD3 颜色角色 ----------
+:root {
+  --md-primary: #006a6a;
+  --md-on-primary: #ffffff;
+  --md-primary-container: #9cf1f0;
+  --md-on-primary-container: #002020;
+  --md-secondary-container: #cce8e7;
+  --md-on-secondary-container: #051f1f;
+  --md-tertiary-container: #ffddb3;
+  --md-on-tertiary-container: #2a1700;
+  --md-surface: #f5fafa;
+  --md-surface-low: #eff5f4;
+  --md-surface-container: #e7efee;
+  --md-surface-high: #dfe8e7;
+  --md-on-surface: #191c1c;
+  --md-on-surface-variant: #3f4948;
+  --md-outline: #6f7978;
+  --md-outline-variant: #bec9c7;
+  --md-error: #ba1a1a;
+  --md-error-container: #ffdad6;
+  --md-on-error-container: #410002;
+  --md-focus: #006a6a;
+  --md-scrim: rgba(24, 30, 29, .45);
+}
 
-// 衍生色（局部实现，基于主色微调）
-$green-deep: #188E55;        // 主绿按下态
-$green-deepest: #15804D;     // 头像/强调文字深绿
-$green-text: #167A4A;        // 成功/数值强调文字
-$surface-hover: #EDF1EF;     // 中性表面悬停
-$neutral-fill: #EEF3F0;      // 弱填充（日志、辅助按钮底）
-$neutral-track: #DCE5E0;     // 滑轨、滚动条
-$text-faint: #849089;        // 弱时间戳文字
-$dot-off: #AAB4AF;           // 状态点（关闭态）
-$error-soft-bg: #FFF3F2;     // 错误弱背景
-$error-border: #EFCFCC;      // 错误弱边框
+// ---------- 布局 ----------
+$window-bar-height: 38px;
+$nav-width: 224px;
+$nav-collapsed-width: 84px;
+$content-max: 1320px;
+$top-bar-height: 70px;
+
+// ---------- 间距阶（4 的倍数） ----------
+$space-1: 4px;
+$space-2: 8px;
+$space-3: 12px;
+$space-4: 16px;
+$space-5: 20px;
+$space-6: 24px;
+$space-8: 32px;
+
+// ---------- 圆角 ----------
+$radius-xs: 6px;     // 小徽标、进度条
+$radius-sm: 8px;     // 小型控件、缩略图
+$radius-md: 12px;    // 输入类控件
+$radius-lg: 16px;    // 卡片（--card-radius）
+$radius-xl: 24px;    // 导航项、胶囊按钮
+$radius-full: 50%;
+
+// ---------- 控件尺寸 ----------
+$control-height: 40px;     // 按钮
+$control-height-dense: 34px;   // chip / status-pill
+$input-height: 46px;       // 搜索栏
+$switch-width: 44px;
+$switch-height: 24px;
+
+// ---------- 字阶 ----------
+$font-family: 'Segoe UI Variable', 'Segoe UI', 'Microsoft YaHei UI', system-ui, sans-serif;
+$font-size-xs: 10px;    // kicker/eyebrow
+$font-size-sm: 12px;    // 正文辅助、标签
+$font-size-md: 13px;    // 导航、正文
+$font-size-base: 14px;  // 标题、区块头
+$font-size-lg: 19px;    // 页标题（紧凑）
+$font-size-xl: 22px;    // 页标题 / 大数字
+$font-size-stat: 23px;  // stat 数字
+
+// ---------- 阴影（ elevation ） ----------
+$elevation-1: 0 1px 3px rgba(20, 30, 24, .12);
+$elevation-2: 0 2px 6px rgba(20, 30, 24, .16);
+$elevation-3: 0 6px 18px rgba(22, 38, 30, .18);
+
+// ---------- SCSS 侧颜色别名（同 --md-* 值，供需要编译期运算的场景） ----------
+$md-primary: #006a6a;
+$md-on-primary: #ffffff;
+$md-primary-container: #9cf1f0;
+$md-on-primary-container: #002020;
+$md-secondary-container: #cce8e7;
+$md-on-secondary-container: #051f1f;
+$md-tertiary-container: #ffddb3;
+$md-on-tertiary-container: #2a1700;
+$md-surface: #f5fafa;
+$md-surface-low: #eff5f4;
+$md-surface-container: #e7efee;
+$md-surface-high: #dfe8e7;
+$md-on-surface: #191c1c;
+$md-on-surface-variant: #3f4948;
+$md-outline: #6f7978;
+$md-outline-variant: #bec9c7;
+$md-error: #ba1a1a;
+$md-error-container: #ffdad6;
+$md-on-error-container: #410002;

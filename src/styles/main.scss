@@ -1,7 +1,24 @@
+@use './tokens' as *;
+@use './components' as *;
 @use './motion' as *;
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: system-ui, -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif; }
+body {
+  font-family: $font-family;
+  color: var(--md-on-surface);
+  background: var(--md-surface);
+  letter-spacing: 0;
+}
+
+button, input { font: inherit; }
+button { cursor: pointer; }
+
+button:focus-visible,
+input:focus-visible,
+[role='switch']:focus-visible {
+  outline: 3px solid var(--md-focus);
+  outline-offset: 2px;
+}
 
 // Keep every scroll surface usable while removing browser scrollbar chrome.
 html, body, #root, * {

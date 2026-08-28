@@ -1,0 +1,407 @@
+// MD3 基础组件层：所有页面共享的控件语言（胶囊按钮、chip、开关、surface 卡片等）。
+// 类名与 features/dashboard/components 下的 React 组件对应。
+@use './tokens' as *;
+@use './motion' as *;
+
+// ---------- 表面 / 卡片 ----------
+.surface {
+  background: var(--md-surface-low);
+  border: 1px solid transparent;
+  border-radius: $radius-lg;
+  overflow: hidden;
+}
+
+.section-head {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $space-3;
+  padding: 0 $space-4;
+  border-bottom: 1px solid var(--md-outline-variant);
+
+  h2 { margin: 0; font-size: $font-size-base; font-weight: 650; color: var(--md-on-surface); }
+  h3 { margin: 0; font-size: $font-size-base; font-weight: 650; color: var(--md-on-surface); }
+}
+
+.text-action {
+  border: 0;
+  color: var(--md-primary);
+  background: transparent;
+  font-size: $font-size-sm;
+  font-weight: 650;
+  cursor: pointer;
+  &:hover { text-decoration: underline; }
+}
+
+// ---------- 按钮 ----------
+// 新组件请用 .md-button；.button 保留给 ConfirmDialog 等既有调用点。
+.md-button,
+.button {
+  min-height: $control-height;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: $space-2;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 20px;
+  font: inherit;
+  font-size: $font-size-sm;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background $motion-duration-base ease, box-shadow $motion-duration-base ease;
+  white-space: nowrap;
+
+  &.filled {
+    color: var(--md-on-primary);
+    background: var(--md-primary);
+    &:hover:not(:disabled) { box-shadow: $elevation-1; }
+  }
+  &.tonal {
+    color: var(--md-on-secondary-container);
+    background: var(--md-secondary-container);
+    &:hover:not(:disabled) { box-shadow: $elevation-1; }
+  }
+  &.outlined {
+    color: var(--md-primary);
+    background: transparent;
+    border: 1px solid var(--md-outline);
+  }
+  &.danger,
+  &.danger-action {
+    color: var(--md-error);
+    background: transparent;
+    border: 1px solid var(--md-error);
+  }
+  &:disabled { opacity: .45; cursor: default; }
+  &.full { width: 100%; }
+}
+
+.icon-button {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: $radius-full;
+  color: var(--md-on-surface-variant);
+  background: transparent;
+  cursor: pointer;
+  transition: background $motion-duration-base ease;
+  &:hover { background: var(--md-surface-high); }
+  &:disabled { opacity: .45; cursor: default; }
+}
+
+// ---------- Chip / 状态胶囊 ----------
+.chip {
+  min-height: $control-height-dense;
+  padding: 0 14px;
+  color: var(--md-on-surface-variant);
+  background: transparent;
+  border: 1px solid var(--md-outline);
+  border-radius: $radius-xs;
+  font: inherit;
+  font-size: $font-size-sm;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background $motion-duration-base ease, color $motion-duration-base ease;
+
+  &.active {
+    color: var(--md-on-secondary-container);
+    background: var(--md-secondary-container);
+    border-color: transparent;
+  }
+}
+
+.status-pill {
+  min-height: $control-height-dense;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 $space-3;
+  color: var(--md-on-secondary-container);
+  background: var(--md-secondary-container);
+  border-radius: 18px;
+  font-size: $font-size-sm;
+  font-weight: 650;
+  white-space: nowrap;
+
+  &::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    background: var(--md-primary);
+    border-radius: $radius-full;
+  }
+}
+
+// ---------- 开关（描边式） ----------
+.switch {
+  width: $switch-width;
+  height: $switch-height;
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  border: 2px solid var(--md-outline);
+  border-radius: 14px;
+  background: var(--md-surface-high);
+  cursor: pointer;
+  transition: background $motion-duration-base ease, border-color $motion-duration-base ease;
+
+  span {
+    width: 16px;
+    height: 16px;
+    background: var(--md-outline);
+    border-radius: $radius-full;
+    transition: transform $motion-duration-base ease, background $motion-duration-base ease;
+  }
+
+  &:disabled { opacity: .45; cursor: default; }
+
+  &.checked {
+    border-color: var(--md-primary);
+    background: var(--md-primary);
+    span { background: var(--md-on-primary); transform: translateX(20px); }
+  }
+}
+
+// ---------- 表单 ----------
+input[type='range'] {
+  width: 100%;
+  accent-color: var(--md-primary);
+  cursor: pointer;
+}
+
+// ---------- 设置行 / 统计卡 / 进度 ----------
+.setting-row {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $space-4;
+  padding: $space-2 0;
+  border-bottom: 1px solid var(--md-outline-variant);
+  &:last-child { border-bottom: 0; }
+
+  b { display: block; font-size: $font-size-sm; font-weight: 650; color: var(--md-on-surface); }
+  span { display: block; margin-top: 3px; color: var(--md-on-surface-variant); font-size: $font-size-xs; }
+}
+
+.stat {
+  min-height: 108px;
+  padding: $space-4;
+  background: var(--md-surface-low);
+  border: 1px solid transparent;
+  border-radius: $radius-lg;
+
+  .stat-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: $space-2;
+    color: var(--md-on-surface-variant);
+    font-size: $font-size-sm;
+    svg { color: var(--md-primary); }
+  }
+  strong { display: block; margin: $space-3 0 $space-1; font-size: $font-size-stat; line-height: 1; color: var(--md-on-surface); }
+  small { color: var(--md-on-surface-variant); font-size: $font-size-sm; }
+}
+
+.progress {
+  height: 6px;
+  overflow: hidden;
+  background: var(--md-surface-high);
+  border-radius: 3px;
+  span { display: block; height: 100%; background: var(--md-primary); border-radius: inherit; }
+}
+
+// ---------- 自定义 Select ----------
+.select-wrap { position: relative; }
+
+.select-trigger {
+  min-height: $control-height-dense;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $space-2;
+  padding: 0 12px;
+  font: inherit;
+  font-size: $font-size-sm;
+  color: var(--md-on-surface);
+  background: var(--md-surface-container);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: $radius-xs;
+  cursor: pointer;
+  transition: border-color $motion-duration-base ease, background $motion-duration-base ease;
+
+  &:hover { background: var(--md-surface-high); }
+  .select-wrap.open & { border-color: var(--md-primary); }
+  .select-wrap.disabled & { opacity: .45; cursor: default; }
+}
+
+.custom-select-menu {
+  position: absolute;
+  z-index: 60;
+  min-width: 100%;
+  max-height: 224px;
+  overflow-y: auto;
+  padding: $space-1;
+  background: var(--md-surface-low);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: $radius-md;
+  box-shadow: $elevation-3;
+  animation: motion-fade-up $motion-duration-fast $motion-ease-out both;
+}
+
+.custom-select-option {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border-radius: $radius-xs;
+  font-size: $font-size-sm;
+  color: var(--md-on-surface);
+  cursor: pointer;
+
+  &.active { background: var(--md-surface-container); }
+  &.selected { color: var(--md-primary); font-weight: 650; }
+}
+
+// ---------- 对话框 ----------
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  display: grid;
+  place-items: center;
+  background: var(--md-scrim);
+  animation: motion-fade-in $motion-duration-fast ease both;
+}
+
+.confirm-dialog {
+  width: min(400px, calc(100vw - 48px));
+  padding: $space-5;
+  background: var(--md-surface-low);
+  border-radius: $radius-lg;
+  box-shadow: $elevation-3;
+  animation: motion-fade-up $motion-duration-base $motion-ease-out both;
+
+  .dialog-icon {
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    margin-bottom: $space-3;
+    color: var(--md-error);
+    background: var(--md-error-container);
+    border-radius: $radius-full;
+  }
+
+  h2 { margin: 0 0 $space-2; font-size: $font-size-base; color: var(--md-on-surface); }
+  p { margin: 0 0 $space-4; font-size: $font-size-sm; line-height: 1.6; color: var(--md-on-surface-variant); }
+
+  div:last-child { display: flex; justify-content: flex-end; gap: $space-2; }
+}
+
+// ---------- Snackbar / Toast ----------
+.toast-host {
+  position: fixed;
+  right: 22px;
+  bottom: 18px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+  pointer-events: none;
+}
+
+.toast-item {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  min-width: 220px;
+  max-width: 340px;
+  min-height: 46px;
+  padding: 0 $space-3 0 $space-4;
+  color: #ffffff;
+  background: #2d312f;
+  border-radius: $radius-xs;
+  box-shadow: $elevation-3;
+  font-size: $font-size-sm;
+  line-height: 1.4;
+  pointer-events: auto;
+  animation: motion-fade-up $motion-duration-base $motion-ease-out both;
+
+  &.success svg { color: #7eddb2; }
+  &.error svg { color: #ffb4ab; }
+  &.info svg { color: #c8e7f5; }
+
+  span { flex: 1; min-width: 0; }
+  .icon-button { flex: 0 0 auto; width: 24px; height: 24px; color: rgba(255, 255, 255, .7); &:hover { background: rgba(255, 255, 255, .12); color: #fff; } }
+}
+
+// ---------- 状态反馈 ----------
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: $space-1;
+  padding: $space-8 $space-4;
+  color: var(--md-on-surface-variant);
+  text-align: center;
+  b { color: var(--md-on-surface); font-size: $font-size-base; }
+  span { font-size: $font-size-sm; }
+}
+
+.page-loading {
+  height: 100vh;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: $space-2;
+  color: var(--md-on-surface-variant);
+  background: var(--md-surface);
+  b { color: var(--md-on-surface); }
+
+  &.load-error .button { margin-top: $space-2; }
+}
+
+.error-banner {
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  padding: $space-2 $space-4;
+  color: var(--md-on-error-container);
+  background: var(--md-error-container);
+  border-radius: $radius-md;
+  font-size: $font-size-sm;
+
+  svg { flex: 0 0 auto; color: var(--md-error); }
+  span { flex: 1; min-width: 0; }
+  .icon-button { width: 28px; height: 28px; }
+}
+
+// ---------- 头像 ----------
+.avatar {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  object-fit: cover;
+  color: var(--md-primary);
+  background: var(--md-secondary-container);
+  border-radius: $radius-full;
+  font-size: $font-size-sm;
+  font-weight: 700;
+
+  &.fallback { overflow: hidden; }
+}
+
+.spin { animation: motion-spin 1s linear infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .toast-item,
+  .confirm-dialog,
+  .custom-select-menu { animation: none; }
+}

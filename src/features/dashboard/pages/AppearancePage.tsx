@@ -1,4 +1,5 @@
 import { AlignJustify, Bell, Combine, Eye, Layers3, MapPin, Minus, MousePointer2, Rows3, Timer, Volume2 } from 'lucide-react'
+import { NotificationToast } from '../../../components/NotificationToast'
 import { SelectField } from '../components/SelectField'
 import { Switch } from '../components/Switch'
 import type { AppConfig, SaveConfig } from '../types'
@@ -29,24 +30,58 @@ export function AppearancePage({ config, saveConfig }: { config: AppConfig; save
   const selectedStyle = NOTIFICATION_STYLES.find((style) => style.id === config.notificationStyle) || NOTIFICATION_STYLES[0]
 
   return <section className="appearance-page page-body">
-    <div className="appearance-intro">
-      <div className="appearance-intro-copy"><span className="appearance-eyebrow">通知呈现</span><h2>调整你的提醒方式</h2><p>让通知在正确的位置，以合适的节奏出现。</p></div>
-      <div className="appearance-current"><span>当前样式</span><b>{selectedStyle.label}</b><small>{selectedStyle.description}</small></div>
-    </div>
-
     <div className="appearance-redesign">
       <section className="surface appearance-card appearance-style-card">
-        <SectionHeader icon={Bell} title="通知样式" description="选择通知弹窗的视觉层次" />
+        <SectionHeader icon={Bell} title="通知样式" description={`当前：${selectedStyle.label} · ${selectedStyle.description}`} />
         <div className="notification-style-picker" role="radiogroup" aria-label="通知样式">
-          {NOTIFICATION_STYLES.map(({ id, label, description, icon: Icon }) => <button type="button" key={id} className={config.notificationStyle === id ? 'active' : ''} role="radio" aria-checked={config.notificationStyle === id} onClick={() => void saveConfig('notificationStyle', id)}>
-            <span className={`style-option-preview preview-${id}`} aria-hidden="true"><i /><i /><i /></span><span className="style-option-copy"><b>{label}</b><small>{description}</small></span><span className="style-option-icon"><Icon size={17} /></span><span className="style-option-state" aria-hidden="true" />
-          </button>)}
+          {NOTIFICATION_STYLES.map(({ id, label, description, icon: Icon }) => (
+            <button type="button" key={id} className={config.notificationStyle === id ? 'active' : ''} role="radio" aria-checked={config.notificationStyle === id} onClick={() => void saveConfig('notificationStyle', id)}>
+              <span className={`style-option-preview preview-${id}`} aria-hidden="true"><i /><i /><i /></span>
+              <span className="style-option-copy"><b>{label}</b><small>{description}</small></span>
+              <span className="style-option-icon"><Icon size={17} /></span>
+              <span className="style-option-state" aria-hidden="true" />
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="surface appearance-card appearance-preview-card">
+        <SectionHeader icon={Eye} title="实时预览" description="按当前设置呈现的弹窗效果" />
+        <div className="preview-canvas">
+          <NotificationToast
+            data={{
+              id: 'appearance-preview',
+              sessionId: 'preview-session',
+              title: '姜北尘',
+              content: '今晚 8 点前把方案发我，我们需要做最后评审。',
+              timestamp: Math.floor(Date.now() / 1000),
+              event: 'message.new',
+              notificationStyle: config.notificationStyle,
+              showSummary: config.showNotificationSummary,
+              clickBehavior: 'none',
+              durationMs: config.notificationDurationMs,
+              opacity: config.notificationOpacity,
+              mergeCount: 1
+            }}
+            onClose={() => { }}
+            onClick={() => { }}
+            isStatic
+            suppressEffects
+            position="static"
+          />
         </div>
       </section>
 
       <section className="surface appearance-card appearance-position-card">
         <SectionHeader icon={MapPin} title="弹窗位置" description="选择通知出现在屏幕的哪个区域" />
-        <div className="position-setting-body"><div className="position-grid" role="group" aria-label="弹窗显示位置">{POSITIONS.map((position, index) => position ? <button type="button" key={position} className={config.notificationPosition === position ? 'active' : ''} aria-label={POSITION_LABELS[position]} aria-pressed={config.notificationPosition === position} onClick={() => void saveConfig('notificationPosition', position)}><span /></button> : <i key={index} aria-hidden="true" />)}</div><div className="position-current"><span>当前显示位置</span><b>{POSITION_LABELS[config.notificationPosition]}</b><small>通知会避开主要工作区域</small></div></div>
+        <div className="position-setting-body">
+          <div className="position-grid" role="group" aria-label="弹窗显示位置">
+            {POSITIONS.map((position, index) => position
+              ? <button type="button" key={position} className={config.notificationPosition === position ? 'active' : ''} aria-label={POSITION_LABELS[position]} aria-pressed={config.notificationPosition === position} onClick={() => void saveConfig('notificationPosition', position)}><span /></button>
+              : <i key={index} aria-hidden="true" />)}
+          </div>
+          <div className="position-current"><span>当前显示位置</span><b>{POSITION_LABELS[config.notificationPosition]}</b><small>通知会避开主要工作区域</small></div>
+        </div>
       </section>
 
       <section className="surface appearance-card appearance-timing-card">

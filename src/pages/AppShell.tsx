@@ -1,7 +1,10 @@
 import { useCallback, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { AlertTriangle, History, Info, LayoutDashboard, Paintbrush, Settings, VolumeX, X } from 'lucide-react'
+import {
+  AlertTriangle, History, Info, LayoutDashboard, Paintbrush, Settings, VolumeX, X
+} from 'lucide-react'
 import { ConfirmDialog } from '../features/dashboard/components/ConfirmDialog'
+import { Switch } from '../features/dashboard/components/Switch'
 import { useDashboardData } from '../features/dashboard/hooks/useDashboardData'
 import { AppearancePage } from '../features/dashboard/pages/AppearancePage'
 import { HistoryPage } from '../features/dashboard/pages/HistoryPage'
@@ -12,6 +15,7 @@ import { AboutPage } from '../features/dashboard/pages/AboutPage'
 import { Titlebar } from '../components/Titlebar'
 import { PAGE_PATHS, type NotifyCenterEntry, type PageId } from '../features/dashboard/types'
 import { ToastHost } from '../features/dashboard/components/Toast'
+import '../features/dashboard/pages/pages.scss'
 import './AppShell.scss'
 
 const NAV_ITEMS: Array<{ id: PageId; label: string; icon: typeof LayoutDashboard }> = [
@@ -23,13 +27,13 @@ const NAV_ITEMS: Array<{ id: PageId; label: string; icon: typeof LayoutDashboard
   { id: 'about', label: '关于', icon: Info }
 ]
 
-const PAGE_META: Record<PageId, { title: string }> = {
-  overview: { title: '运行概览' },
-  history: { title: '通知历史' },
-  rules: { title: '静音规则' },
-  appearance: { title: '外观设置' },
-  settings: { title: '系统设置' },
-  about: { title: '关于 PingNest' }
+const PAGE_META: Record<PageId, { title: string; subtitle: string }> = {
+  overview: { title: '运行概览', subtitle: '监控本地微信事件与桌面通知状态' },
+  history: { title: '通知历史', subtitle: '搜索、筛选并处理本地通知记录' },
+  rules: { title: '静音规则', subtitle: '管理不会触发桌面弹窗的消息条件' },
+  appearance: { title: '外观与弹窗', subtitle: '调整桌面通知的位置与交互方式' },
+  settings: { title: '系统设置', subtitle: '配置后台行为与本地数据保留策略' },
+  about: { title: '关于 PingNest', subtitle: '了解 PingNest 与本地数据处理方式' }
 }
 
 const PATH_PAGES = Object.fromEntries(Object.entries(PAGE_PATHS).map(([page, path]) => [path, page])) as Record<string, PageId>
@@ -86,22 +90,69 @@ export default function AppShell() {
     if (success) setConfirmRemoveHook(false)
   }
 
-  if ((!config || !status) && errorMessage) return <div className="page-loading load-error"><AlertTriangle size={22} /><b>应用初始化失败</b><span>{errorMessage}</span><button className="button" onClick={() => void dashboard.refresh()}>重试</button></div>
+  if ((!config || !status) && errorMessage) return <div className="page-loading load-error"><AlertTriangle size={22} /><b>应用初始化失败</b><span>{errorMessage}</span><button className="button outlined" onClick={() => void dashboard.refresh()}>重试</button></div>
   if (!config || !status) return <div className="page-loading">正在准备应用...</div>
+
+  const healthy = status.connected && status.wcdbReady
+  const serviceLabel = !status.hasFullConfig ? '未配置' : !status.wechatRunning ? '等待微信' : healthy ? '服务运行中' : '连接中断'
 
   return <div className="app-shell">
     <Titlebar variant="app" closeLabel={config.closeToTray ? '隐藏到系统托盘' : '退出应用'} />
-    <aside className="sidebar"><nav aria-label="主导航">{NAV_ITEMS.map((item) => { const Icon = item.icon; return <button key={item.id} className={page === item.id ? 'active' : ''} aria-current={page === item.id ? 'page' : undefined} onClick={() => navigate(PAGE_PATHS[item.id])} title={item.label}><Icon size={18} /><span>{item.label}</span>{item.id === 'history' && unreadCount > 0 && <i>{Math.min(unreadCount, 99)}</i>}</button> })}</nav></aside>
+
+    <aside className="nav-drawer">
+      <div className="drawer-title">
+        <img src="./icon.png" alt="" />
+        <div><b>通知伴侣</b><span>{healthy ? '本地运行中' : serviceLabel}</span></div>
+      </div>
+      <nav className="nav-list" aria-label="主导航">
+        {NAV_ITEMS.map((item) => {
+          const Icon = item.icon
+          return <button
+            key={item.id}
+            className={'nav-item' + (page === item.id ? ' active' : '')}
+            aria-current={page === item.id ? 'page' : undefined}
+            onClick={() => navigate(PAGE_PATHS[item.id])}
+            title={item.label}
+          >
+            <Icon size={20} />
+            <span>{item.label}</span>
+            {item.id === 'history' && unreadCount > 0 && <i className="badge">{Math.min(unreadCount, 99)}</i>}
+          </button>
+        })}
+      </nav>
+    </aside>
+
     <main className="workspace" key={page}>
-      {errorMessage && <div className="error-banner" role="alert"><AlertTriangle size={15} /><span>{errorMessage}</span><button className="icon-button" onClick={() => dashboard.setErrorMessage('')} aria-label="关闭错误提示" title="关闭"><X size={14} /></button></div>}
-      <section className="page-heading"><div><h1>{PAGE_META[page].title}</h1></div></section>
-      {page === 'overview' && <OverviewPage status={status} config={config} entries={entries} rules={config.notifyRules} busy={dashboard.busy} connecting={dashboard.hookBusy} checking={dashboard.checking} lastStatusAt={dashboard.lastStatusAt} onOpenHistory={openHistory} onRefresh={dashboard.checkNow} onConnect={() => void dashboard.rehook()} onReconnect={() => void dashboard.reconnect()} onToggleNotifications={(enabled) => void dashboard.saveConfig('notificationEnabled', enabled)} />}
-      {page === 'history' && <HistoryPage entries={entries} selectedId={selectedId} onSelect={(sessionId, latestEntryId) => { setSelectedId(latestEntryId); void dashboard.markSessionRead(sessionId) }} onRequestRemove={setPendingDelete} onRequestClear={() => setConfirmClear(true)} />}
-      {page === 'rules' && <RulesPage config={config} entries={entries} saveConfig={dashboard.saveConfig} />}
-      {page === 'appearance' && <AppearancePage config={config} saveConfig={dashboard.saveConfig} />}
-      {page === 'settings' && <SystemSettingsPage config={config} status={status} hookBusy={dashboard.busy || dashboard.hookBusy} hookProgress={dashboard.hookProgress} entryCount={entries.length} saveConfig={dashboard.saveConfig} onRequestClear={() => setConfirmClear(true)} onReconnect={() => void dashboard.reconnect()} onRehook={() => void dashboard.rehook()} onRequestRemoveHook={() => setConfirmRemoveHook(true)} />}
-      {page === 'about' && <AboutPage config={config} status={status} entryCount={entries.length} />}
+      <header className="top-app-bar">
+        <div>
+          <h1>{PAGE_META[page].title}</h1>
+          <p>{PAGE_META[page].subtitle}</p>
+        </div>
+        <div className="top-actions">
+          <span className="status-pill">{serviceLabel}</span>
+          <label className="top-toggle">
+            <span>桌面弹窗</span>
+            <Switch
+              checked={config.notificationEnabled}
+              onChange={(enabled) => void dashboard.saveConfig('notificationEnabled', enabled)}
+              label="开启或关闭桌面弹窗"
+            />
+          </label>
+        </div>
+      </header>
+
+      {errorMessage && <div className="workspace-error"><div className="error-banner" role="alert"><AlertTriangle size={15} /><span>{errorMessage}</span><button className="icon-button" onClick={() => dashboard.setErrorMessage('')} aria-label="关闭错误提示" title="关闭"><X size={14} /></button></div></div>}
+
+      <div className="content">
+        {page === 'overview' && <OverviewPage status={status} config={config} entries={entries} rules={config.notifyRules} busy={dashboard.busy} connecting={dashboard.hookBusy} checking={dashboard.checking} lastStatusAt={dashboard.lastStatusAt} onOpenHistory={openHistory} onRefresh={dashboard.checkNow} onConnect={() => void dashboard.rehook()} onReconnect={() => void dashboard.reconnect()} />}
+        {page === 'history' && <HistoryPage entries={entries} selectedId={selectedId} onSelect={(sessionId, latestEntryId) => { setSelectedId(latestEntryId); void dashboard.markSessionRead(sessionId) }} onRequestRemove={setPendingDelete} onRequestClear={() => setConfirmClear(true)} />}
+        {page === 'rules' && <RulesPage config={config} entries={entries} saveConfig={dashboard.saveConfig} />}
+        {page === 'appearance' && <AppearancePage config={config} saveConfig={dashboard.saveConfig} />}
+        {page === 'settings' && <SystemSettingsPage config={config} status={status} hookBusy={dashboard.busy || dashboard.hookBusy} hookProgress={dashboard.hookProgress} entryCount={entries.length} saveConfig={dashboard.saveConfig} onRequestClear={() => setConfirmClear(true)} onReconnect={() => void dashboard.reconnect()} onRehook={() => void dashboard.rehook()} onRequestRemoveHook={() => setConfirmRemoveHook(true)} />}
+        {page === 'about' && <AboutPage config={config} status={status} entryCount={entries.length} />}
+      </div>
     </main>
+
     {confirmClear && <ConfirmDialog count={entries.length} busy={destructiveBusy} onCancel={() => setConfirmClear(false)} onConfirm={() => void clearAllEntries()} />}
     {pendingDelete && <ConfirmDialog title="删除这条消息？" description={`将删除“${pendingDelete.payload.groupName || pendingDelete.payload.sourceName}”会话中的这条本地记录，此操作无法撤销。`} confirmLabel="删除消息" busy={destructiveBusy} onCancel={() => setPendingDelete(null)} onConfirm={() => void removePendingEntry()} />}
     {confirmRemoveHook && <ConfirmDialog title="删除微信连接？" description="删除后将停止消息监听并返回连接页面。通知历史和其他设置不会被清除。" confirmLabel="删除连接" busy={dashboard.hookBusy} onCancel={() => setConfirmRemoveHook(false)} onConfirm={() => void removeHook()} />}

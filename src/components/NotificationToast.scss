@@ -1,3 +1,6 @@
+// 桌面通知弹窗（MD3 surface 语言）。
+// 四种样式的宽度/高度必须与 shared/notificationMetrics.ts 的尺寸表一致，
+// 否则通知窗口会被裁剪或留白——改尺寸时两处同步。
 @use '../styles/tokens' as *;
 @use '../styles/motion' as *;
 
@@ -5,96 +8,97 @@
   position: relative;
   z-index: 9999;
   width: 400px;
-  min-height: 122px;
+  min-height: 118px;
   padding: 16px 16px 13px;
   overflow: hidden;
-  color: $text;
-  background: #fff;
-  border: 1px solid $border;
-  border-radius: 10px;
-  box-shadow: 0 12px 28px rgba(24, 45, 34, .14), 0 2px 6px rgba(24, 45, 34, .05);
-  font-family: "Segoe UI Variable", "Segoe UI", "Microsoft YaHei UI", sans-serif;
+  color: var(--md-on-surface);
+  background: var(--md-surface-low);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: $radius-lg;
+  box-shadow: $elevation-3;
+  font-family: $font-family;
   transition: border-color 160ms ease, box-shadow 180ms ease, background 160ms ease;
 
-  &::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--nt-accent, $green); }
+  &::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--nt-accent, var(--md-primary)); }
   .notification-content, .notification-close { position: relative; z-index: 1; }
-  .notification-progress { position: absolute; z-index: 2; right: 0; bottom: 0; left: 0; height: 2px; transform-origin: left center; background: var(--nt-accent, $green); animation: motion-progress var(--nt-duration, 5000ms) linear both; opacity: .72; }
+  .notification-progress { position: absolute; z-index: 2; right: 0; bottom: 0; left: 0; height: 2px; transform-origin: left center; background: var(--nt-accent, var(--md-primary)); animation: motion-progress var(--nt-duration, 5000ms) linear both; opacity: .72; }
   &.static { position: relative !important; width: calc(100% - 4px) !important; height: auto !important; inset: auto !important; margin: 2px !important; transform: none !important; }
   &.clickable .notification-open { cursor: pointer; }
-  &.clickable:hover { border-color: rgba(32, 168, 102, .45); box-shadow: 0 16px 32px rgba(24, 45, 34, .18), 0 3px 8px rgba(24, 45, 34, .07); }
+  &.clickable:hover { border-color: color-mix(in srgb, var(--md-primary) 45%, transparent); box-shadow: $elevation-3, 0 3px 8px rgba(20, 30, 24, .08); }
   &.revoke { --nt-accent: #c57925; }
 
   .notification-content { width: 100%; display: flex; align-items: flex-start; gap: 12px; padding: 0; border: 0; color: inherit; text-align: left; background: transparent; }
   .notification-open:disabled { cursor: default; opacity: 1; }
-  .notification-open:focus-visible { outline: 0; box-shadow: inset 0 0 0 2px rgba(32, 168, 102, .35); border-radius: 6px; }
+  .notification-open:focus-visible { outline: 0; box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--md-primary) 40%, transparent); border-radius: $radius-xs; }
   .notification-avatar { flex: 0 0 auto; padding-top: 3px; }
-  .nt-avatar-img, .nt-avatar-fallback { width: 42px !important; height: 42px !important; border-radius: 9px; }
+  .nt-avatar-img, .nt-avatar-fallback { width: 42px !important; height: 42px !important; border-radius: 12px; }
   .nt-avatar-img { display: block; object-fit: cover; }
-  .nt-avatar-fallback { display: flex; align-items: center; justify-content: center; color: $green-deepest; background: $green-soft; font-weight: 700; user-select: none; }
+  .nt-avatar-fallback { display: flex; align-items: center; justify-content: center; color: var(--md-primary); background: var(--md-secondary-container); font-weight: 700; user-select: none; }
   .notification-text { min-width: 0; flex: 1; }
-  .notification-kicker { display: block; margin-bottom: 3px; color: $green-text; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+  .notification-kicker { display: block; margin-bottom: 3px; color: var(--md-primary); font-size: $font-size-xs; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
   .notification-header { min-height: 21px; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 5px; }
-  .notification-title { min-width: 0; overflow: hidden; color: $text; font-size: 14px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-  .notification-time { flex: 0 0 auto; color: $text-faint; font-size: 10px; font-variant-numeric: tabular-nums; }
-  .notification-body { display: -webkit-box; overflow: hidden; color: #4d5f55; font-size: 12px; line-height: 1.5; word-break: break-word; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
-  .nt-type-icon, .nt-revoke-icon { display: inline; margin-right: 4px; color: var(--nt-accent, $green-deep); vertical-align: -2px; }
-  .notification-footer { min-height: 18px; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 9px; color: $text-faint; font-size: 10px; }
-  .nt-merge-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 19px; padding: 0 6px; color: #fff; background: var(--nt-accent, $green); border-radius: 999px; font-size: 10px; font-weight: 700; }
-  .notification-close { position: absolute; top: 9px; right: 9px; width: 23px; height: 23px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 5px; color: $text-faint; background: transparent; opacity: .65; transition: color 140ms ease, background 140ms ease, opacity 140ms ease; &:hover, &:focus-visible { color: $text; background: $surface-hover; opacity: 1; } &:focus-visible { outline: 2px solid rgba($green, .35); outline-offset: 1px; } }
+  .notification-title { min-width: 0; overflow: hidden; color: var(--md-on-surface); font-size: $font-size-base; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+  .notification-time { flex: 0 0 auto; color: var(--md-on-surface-variant); font-size: $font-size-xs; font-variant-numeric: tabular-nums; }
+  .notification-body { display: -webkit-box; overflow: hidden; color: var(--md-on-surface-variant); font-size: $font-size-sm; line-height: 1.5; word-break: break-word; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
+  .nt-type-icon, .nt-revoke-icon { display: inline; margin-right: 4px; color: var(--nt-accent, var(--md-primary)); vertical-align: -2px; }
+  .notification-footer { min-height: 18px; display: flex; align-items: center; justify-content: space-between; gap: $space-2; margin-top: 9px; color: var(--md-on-surface-variant); font-size: $font-size-xs; }
+  .nt-merge-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 19px; padding: 0 6px; color: var(--md-on-primary); background: var(--nt-accent, var(--md-primary)); border-radius: 999px; font-size: $font-size-xs; font-weight: 700; }
+  .notification-close { position: absolute; top: 9px; right: 9px; width: 23px; height: 23px; display: grid; place-items: center; padding: 0; border: 0; border-radius: $radius-sm; color: var(--md-on-surface-variant); background: transparent; opacity: .65; transition: color 140ms ease, background 140ms ease, opacity 140ms ease; &:hover, &:focus-visible { color: var(--md-on-surface); background: var(--md-surface-high); opacity: 1; } &:focus-visible { outline: 2px solid color-mix(in srgb, var(--md-primary) 40%, transparent); outline-offset: 1px; } }
   &:hover .notification-close, &:focus-within .notification-close { opacity: 1; }
 
-  // Standard: balanced card with clear source, message and status hierarchy.
+  // Standard: 平衡卡片，来源/正文/状态分层。
   &.style-standard {
-    background: #fbfdfc;
-    box-shadow: inset 0 1px 0 rgba(32, 168, 102, .08), 0 12px 28px rgba(24, 45, 34, .14), 0 2px 6px rgba(24, 45, 34, .05);
-    .notification-footer { border-top: 1px solid #edf1ef; padding-top: 7px; }
+    background: var(--md-surface-low);
+    .notification-footer { border-top: 1px solid var(--md-outline-variant); padding-top: 7px; }
   }
 
-  // Compact: one-line scanner for frequent notifications.
+  // Compact: 单行速览条，深色 surface 反色。
   &.style-compact {
-    width: 344px; min-height: 70px; padding: 11px 36px 10px 12px; color: #f4faf6; background: #1f2b25; border-color: #34483d; border-radius: 8px; box-shadow: 0 13px 25px rgba(15, 29, 21, .25);
+    width: 344px; min-height: 70px; padding: 11px 36px 10px 12px; color: #d7f4f2; background: #002f2e; border-color: #0d4240; border-radius: $radius-md; box-shadow: $elevation-3;
     &::before { width: 3px; }
     .notification-content { align-items: center; gap: 9px; }
     .notification-avatar { padding-top: 0; }
-    .nt-avatar-img, .nt-avatar-fallback { width: 32px !important; height: 32px !important; border-radius: 7px; }
-    .nt-avatar-fallback { color: #c4efd3; background: #31503e; }
+    .nt-avatar-img, .nt-avatar-fallback { width: 32px !important; height: 32px !important; border-radius: 8px; }
+    .nt-avatar-fallback { color: #9cf1f0; background: #0d4a48; }
     .notification-kicker { display: none; }
     .notification-header { min-height: 18px; margin-bottom: 2px; }
-    .notification-title { color: #f4faf6; font-size: 12px; }
-    .notification-time { color: #9fb1a6; font-size: 10px; }
-    .notification-body { display: block; color: #c6d5cc; font-size: 11px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+    .notification-title { color: #eafcfa; font-size: $font-size-sm; }
+    .notification-time { color: #86aeab; font-size: $font-size-xs; }
+    .notification-body { display: block; color: #a9cfcc; font-size: 11px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
     .notification-footer { display: none; }
-    .nt-type-icon, .nt-revoke-icon { color: #8ed9aa; }
-    .notification-close { top: 50%; right: 8px; color: #9fb1a6; background: rgba(255, 255, 255, .06); transform: translateY(-50%); &:hover, &:focus-visible { color: #fff; background: rgba(255, 255, 255, .15); } }
+    .nt-type-icon, .nt-revoke-icon { color: #5fded9; }
+    .notification-close { top: 50%; right: 8px; color: #86aeab; background: rgba(255, 255, 255, .06); transform: translateY(-50%); &:hover, &:focus-visible { color: #fff; background: rgba(255, 255, 255, .15); } }
     .notification-progress { height: 1px; opacity: .9; }
   }
 
-  // Layered: announcement-like treatment for content that should stand out.
+  // Layered: 重点卡片，primary-container 反色 + 实体错位阴影。
   &.style-layered {
-    width: 420px; min-height: 136px; padding: 18px 18px 15px 21px; background: #eff9f2; border-color: #bdddc8; border-radius: 12px; box-shadow: 6px 6px 0 #d4e8da, 0 15px 30px rgba(24, 60, 39, .14);
-    &::before { width: 6px; }
+    width: 420px; min-height: 136px; padding: 18px 18px 15px 21px; color: var(--md-on-primary-container); background: var(--md-primary-container); border-color: transparent; border-radius: $radius-lg; box-shadow: 6px 6px 0 var(--md-surface-high), $elevation-3;
+    &::before { width: 6px; background: var(--nt-accent, var(--md-primary)); }
     .notification-content { gap: 14px; }
     .notification-avatar { padding-top: 0; }
-    .nt-avatar-img, .nt-avatar-fallback { width: 48px !important; height: 48px !important; border-radius: 12px; }
-    .nt-avatar-fallback { border: 1px solid #b8dcc6; background: #dff3e6; }
-    .notification-kicker { margin-bottom: 4px; color: #177548; }
+    .nt-avatar-img, .nt-avatar-fallback { width: 48px !important; height: 48px !important; border-radius: $radius-md; }
+    .nt-avatar-fallback { color: var(--md-primary); background: color-mix(in srgb, var(--md-surface-low) 72%, transparent); }
+    .notification-kicker { margin-bottom: 4px; color: var(--md-primary); }
     .notification-title { font-size: 15px; }
-    .notification-body { color: #405b4c; font-size: 13px; line-height: 1.55; }
-    .notification-footer { margin-top: 11px; color: #5d7b68; }
-    .notification-close { color: #5d7b68; }
+    .notification-time { color: color-mix(in srgb, var(--md-on-primary-container) 70%, transparent); }
+    .notification-body { color: color-mix(in srgb, var(--md-on-primary-container) 88%, var(--md-primary)); font-size: $font-size-md; line-height: 1.55; }
+    .notification-footer { margin-top: 11px; color: color-mix(in srgb, var(--md-on-primary-container) 72%, transparent); }
+    .nt-merge-badge { background: var(--md-primary); }
+    .notification-close { color: var(--md-on-primary-container); }
     .notification-progress { right: 10px; bottom: 7px; left: 10px; border-radius: 999px; }
   }
 
-  // Minimal: text-first alert with only a status rail and action affordance.
+  // Minimal: 文字提示条，只保留状态条与关闭。
   &.style-minimal {
-    width: 360px; min-height: 66px; padding: 11px 36px 10px 22px; border-radius: 7px; box-shadow: 0 8px 20px rgba(24, 45, 34, .11);
+    width: 360px; min-height: 66px; padding: 11px 36px 10px 22px; border-radius: $radius-md; box-shadow: $elevation-2;
     &::before { inset: 0 auto 0 0; width: 3px; }
     .notification-avatar { display: none; }
     .notification-kicker { display: none; }
     .notification-header { min-height: 18px; margin-bottom: 2px; }
-    .notification-title { font-size: 13px; font-weight: 650; }
-    .notification-time { font-size: 10px; }
-    .notification-body { display: block; color: #5e7066; font-size: 11px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+    .notification-title { font-size: $font-size-md; font-weight: 650; }
+    .notification-time { font-size: $font-size-xs; }
+    .notification-body { display: block; color: var(--md-on-surface-variant); font-size: 11px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
     .notification-footer { display: none; }
     .notification-close { top: 50%; right: 8px; transform: translateY(-50%); }
     .notification-progress { height: 1px; opacity: .5; }
