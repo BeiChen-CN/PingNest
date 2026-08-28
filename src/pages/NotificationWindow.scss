@@ -48,7 +48,11 @@
   to { opacity: 0; transform: translate3d(8px, 0, 0) scale(.975); }
 }
 
-body {
+// 透明画布：通知窗口 transparent: true，页面任何不透明背景都会变成"白色画布"。
+// 用 html > body 提高优先级，避免与全局样式表因打包顺序竞级。
+html { background: transparent; }
+
+html > body {
   background: transparent;
   overflow: hidden;
   margin: 0;

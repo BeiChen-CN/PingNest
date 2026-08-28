@@ -3,10 +3,11 @@
 @use './motion' as *;
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
+// 注意：body 不设背景色——通知弹窗窗口依赖透明画布，
+// 各窗口壳（.app-shell / .hook-shell / .page-loading）自带背景。
 body {
   font-family: $font-family;
   color: var(--md-on-surface);
-  background: var(--md-surface);
   letter-spacing: 0;
 }
 
