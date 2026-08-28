@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events'
 import { chatService, type ChatSession } from './chatService'
 import { ConfigService } from './config'
+import { getMessageDisplayContent } from '../../shared/messageContent'
 import { normalizeMessageSendState, shouldPushIncomingMessage } from './messageDirection'
 import { resolveGroupDisplayName, resolveSessionDisplayName } from './displayName'
 import {
@@ -407,7 +408,7 @@ export class MessagePushService extends EventEmitter {
 
     const isGroup = sessionId.endsWith('@chatroom')
     const sessionType = this.getSessionType(sessionId, session)
-    const content = this.getMessageDisplayContent(message)
+    const content = getMessageDisplayContent(message)
     const rawid = String(message.serverIdRaw || message.serverId || '').trim() || String(message.localId || '')
     const createTime = Number(message.createTime || 0)
 
@@ -450,7 +451,7 @@ export class MessagePushService extends EventEmitter {
 
     const original = this.findRevokedOriginalInMessages(fetchedMessages, message)
     const originalContent = original
-      ? this.getMessageDisplayContent(original)
+      ? getMessageDisplayContent(original)
       : this.extractReplaceMsg(String(message.rawContent || message.parsedContent || ''))
 
     const isGroup = sessionId.endsWith('@chatroom')
@@ -508,34 +509,6 @@ export class MessagePushService extends EventEmitter {
   private isSelfRevokeMessage(message: any): boolean {
     const content = String(message.rawContent || '') + '\n' + String(message.parsedContent || '')
     return content.includes('你撤回')
-  }
-
-  private getMessageDisplayContent(message: any): string | null {
-    const normalizeTextContent = (value: string | null | undefined): string | null => {
-      const text = String(value || '')
-      if (!text) return null
-      return text.replace(/^[\s]*([a-zA-Z0-9_@-]+):(?!\/\/)(?:\s*(?:\r?\n|<br\s*\/?>)\s*|\s*)/i, '').trim()
-    }
-    switch (Number(message.localType || 0)) {
-      case 1:
-        return normalizeTextContent(message.parsedContent || message.rawContent)
-      case 3:
-        return '[图片]'
-      case 34:
-        return '[语音]'
-      case 43:
-        return '[视频]'
-      case 47:
-        return '[表情]'
-      case 42:
-        return message.cardNickname || '[名片]'
-      case 48:
-        return '[位置]'
-      case 49:
-        return message.linkTitle || message.fileName || '[消息]'
-      default:
-        return normalizeTextContent(message.parsedContent || message.rawContent) || null
-    }
   }
 
   private async resolveGroupSourceName(chatroomId: string, message: any, session: ChatSession): Promise<string> {

@@ -2,7 +2,6 @@ import { ConfigService, type NotifyRule, type NotificationPosition } from '../se
 import type { MessagePushPayload } from '../services/messagePushService'
 
 export interface RuleEffect {
-  themeId?: string
   accentColor?: string
   durationMs?: number
   position?: NotificationPosition
@@ -45,7 +44,6 @@ export class RuleEngine {
 
       if (hit) {
         return {
-          themeId: rule.themeId || undefined,
           accentColor: rule.accentColor || undefined,
           durationMs: rule.durationMs || undefined,
           position: rule.position || undefined,

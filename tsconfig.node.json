@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    "composite": true,
     "skipLibCheck": true,
     "module": "ESNext",
     "moduleResolution": "bundler",
@@ -14,6 +13,7 @@
   "include": [
     "vite.config.ts",
     "electron/**/*.ts",
-    "electron/**/*.d.ts"
+    "electron/**/*.d.ts",
+    "shared/**/*.ts"
   ]
 }

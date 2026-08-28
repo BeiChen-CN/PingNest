@@ -3,7 +3,7 @@ import { appendFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'fs
 import { tmpdir } from 'os'
 import { createHash } from 'crypto'
 import { resolveSqlMessageSendState } from './messageDirection'
-import { expandHomePath } from './dbPathService'
+import { cleanAccountDirName, expandHomePath } from './dbPathService'
 import { mapSqlMessageContent } from './sqlMessageContent'
 
 // 数据服务初始化错误信息
@@ -495,7 +495,7 @@ export class WcdbCore {
   /** 打开数据库 */
   async open(dbPath: string, hexKey: string, wxid: string): Promise<boolean> {
     try {
-      const accountWxid = this.cleanAccountDirName(wxid)
+      const accountWxid = cleanAccountDirName(wxid)
       lastDllInitError = null
       if (!this.initialized) {
         const initOk = await this.initialize()
@@ -1028,15 +1028,6 @@ export class WcdbCore {
   }
 
   // --- 路径解析 ---
-
-  private cleanAccountDirName(value: string): string {
-    const trimmed = String(value || '').trim()
-    if (!trimmed) return ''
-    const wxidMatch = trimmed.match(/^(wxid_[^_]+)/i)
-    if (wxidMatch) return wxidMatch[1]
-    const suffixMatch = trimmed.match(/^(.+)_([a-zA-Z0-9]{4})$/)
-    return suffixMatch ? suffixMatch[1] : trimmed
-  }
 
   private resolveDbStoragePath(basePath: string, wxid: string): string | null {
     if (!basePath) return null

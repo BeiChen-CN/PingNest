@@ -129,6 +129,8 @@ electron/
 |-- rules/                          通知规则引擎
 `-- windows/                        通知窗口与多显示器布局
 
+shared/                           主进程与渲染层共享的类型与纯逻辑（配置、消息文案、通知几何）
+
 src/
 |-- components/                     桌面通知组件
 |-- features/dashboard/             概览、历史、静音、外观、设置和关于页面

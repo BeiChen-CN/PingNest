@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { NotificationToast, type NotificationData } from '../components/NotificationToast'
+import { calculateNotificationMaxHeight, calculateNotificationWidth, type NotificationStyle } from '../../shared/notificationMetrics'
 import '../components/NotificationToast.scss'
 import './NotificationWindow.scss'
 
@@ -12,7 +13,7 @@ interface RawNotificationData {
   timestamp: number
   event?: 'message.new' | 'message.revoke'
   position?: string
-  notificationStyle?: 'standard' | 'compact' | 'layered' | 'minimal'
+  notificationStyle?: NotificationStyle
   accentColor?: string
   durationMs?: number
   mergeWindowMs?: number
@@ -200,15 +201,9 @@ export default function NotificationWindow() {
       const root = document.getElementById('notification-root')
       if (root) {
         const height = root.offsetHeight
-        const style = notification?.notificationStyle || prevNotification?.notificationStyle || 'standard'
-        const width = style === 'compact'
-          ? 344
-          : style === 'minimal'
-            ? 360
-            : style === 'layered'
-              ? (position === 'top-center' ? 400 : 420)
-              : (position === 'top-center' ? 360 : 400)
-        const maxHeight = style === 'compact' ? 96 : style === 'minimal' ? 92 : style === 'layered' ? 190 : 180
+        const style: NotificationStyle = notification?.notificationStyle || prevNotification?.notificationStyle || 'standard'
+        const width = calculateNotificationWidth(position === 'top-center' ? 'top-center' : 'top-right', style)
+        const maxHeight = calculateNotificationMaxHeight(style)
         window.electronAPI?.notification?.resize(width, Math.min(height + 4, maxHeight))
       }
     }, 60)

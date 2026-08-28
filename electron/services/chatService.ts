@@ -1,5 +1,6 @@
 import { dbWorkerClient } from './dbWorkerClient'
 import { ConfigService } from './config'
+import { cleanAccountDirName } from './dbPathService'
 import { join } from 'path'
 import { resolveContactDisplayName } from './displayName'
 
@@ -81,7 +82,7 @@ export class ChatService {
         : join(process.cwd(), 'resources')
       await dbWorkerClient.setPaths(resourcesPath, this.configService.getCacheBasePath())
 
-      const cleanedWxid = this.cleanAccountDirName(wxid)
+      const cleanedWxid = cleanAccountDirName(wxid)
       const openResult = await dbWorkerClient.open(dbPath, decryptKey, cleanedWxid)
       if (!openResult.success) {
         return { success: false, error: openResult.error || '暂时无法读取微信通知' }
@@ -207,18 +208,6 @@ export class ChatService {
     if (lower.includes('base64,ffd8')) return false
     if (lower.startsWith('ffd8')) return false
     return true
-  }
-
-  cleanAccountDirName(dirName: string): string {
-    const trimmed = dirName.trim()
-    if (!trimmed) return trimmed
-    if (trimmed.toLowerCase().startsWith('wxid_')) {
-      const match = trimmed.match(/^(wxid_[^_]+)/i)
-      if (match) return match[1]
-      return trimmed
-    }
-    const suffixMatch = trimmed.match(/^(.+)_([a-zA-Z0-9]{4})$/)
-    return suffixMatch ? suffixMatch[1] : trimmed
   }
 
   async close(): Promise<void> {

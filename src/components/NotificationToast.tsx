@@ -1,5 +1,7 @@
 import React from 'react'
 import { X, Undo2, Image as ImageIcon, Mic, Video, Smile } from 'lucide-react'
+import { MESSAGE_PLACEHOLDER } from '../../shared/messageContent'
+import type { NotificationStyle } from '../../shared/notificationMetrics'
 import './NotificationToast.scss'
 
 export interface NotificationData {
@@ -12,7 +14,7 @@ export interface NotificationData {
   timestamp: number
   event?: 'message.new' | 'message.revoke'
   position?: string
-  notificationStyle?: 'standard' | 'compact' | 'layered' | 'minimal'
+  notificationStyle?: NotificationStyle
   accentColor?: string
   durationMs?: number
   mergeCount?: number
@@ -57,10 +59,10 @@ function Avatar({ src, name, size = 40 }: { src?: string; name: string; size?: n
 
 function MessageTypeIcon({ content }: { content: string | null }) {
   const c = String(content || '')
-  if (c.includes('[图片]')) return <ImageIcon size={13} className="nt-type-icon" />
-  if (c.includes('[语音]')) return <Mic size={13} className="nt-type-icon" />
-  if (c.includes('[视频]')) return <Video size={13} className="nt-type-icon" />
-  if (c.includes('[表情]')) return <Smile size={13} className="nt-type-icon" />
+  if (c.includes(MESSAGE_PLACEHOLDER.image)) return <ImageIcon size={13} className="nt-type-icon" />
+  if (c.includes(MESSAGE_PLACEHOLDER.voice)) return <Mic size={13} className="nt-type-icon" />
+  if (c.includes(MESSAGE_PLACEHOLDER.video)) return <Video size={13} className="nt-type-icon" />
+  if (c.includes(MESSAGE_PLACEHOLDER.emoticon)) return <Smile size={13} className="nt-type-icon" />
   return null
 }
 

@@ -19,6 +19,22 @@ export function expandHomePath(inputPath: string): string {
 }
 
 /**
+ * 清理账号目录名，得到真实 wxid：
+ * `wxid_abc_def123` → `wxid_abc`（微信多开目录会带随机后缀）；
+ * 普通账号目录 `zhangsan_ab12` → `zhangsan`。
+ */
+export function cleanAccountDirName(value: string): string {
+  const trimmed = String(value || '').trim()
+  if (!trimmed) return ''
+  if (trimmed.toLowerCase().startsWith('wxid_')) {
+    const match = trimmed.match(/^(wxid_[^_]+)/i)
+    return match ? match[1] : trimmed
+  }
+  const suffixMatch = trimmed.match(/^(.+)_([a-zA-Z0-9]{4})$/)
+  return suffixMatch ? suffixMatch[1] : trimmed
+}
+
+/**
  * DbPathService（移植自 WeFlow，仅保留 Windows 数据目录发现）
  * 负责发现微信 4.0 数据根目录与账号（wxid_xxx）目录，
  * 并从 global_config 中解析昵称/头像。

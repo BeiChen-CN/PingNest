@@ -6,7 +6,7 @@ import {
   calculateNotificationWidth,
   normalizeNotificationPosition,
   normalizeNotificationStyle
-} from '../electron/windows/notificationLayout.ts'
+} from '../shared/notificationMetrics.ts'
 
 const workArea = { x: 100, y: 50, width: 1920, height: 1040 }
 

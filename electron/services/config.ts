@@ -1,102 +1,13 @@
 import { app, safeStorage } from 'electron'
 import Store from 'electron-store'
+import { DEFAULT_CONFIG, type AppConfig, type NotificationClickBehavior, type NotificationFilterMode, type NotificationPosition, type NotificationStyle, type NotifyRule } from '../../shared/appConfig'
 
-export interface NotifyRule {
-  id: string
-  name: string
-  enabled: boolean
-  /** 匹配范围：sessionId 精确匹配（联系人/群） */
-  sessionIds: string[]
-  /** 关键词（内容包含任一即命中） */
-  keywords: string[]
-  /** 匹配类型：any（会话或关键词命中即生效）| all（全部条件满足） */
-  matchMode: 'any' | 'all'
-  /** 覆盖的主题 */
-  themeId?: string
-  /** 强调色 */
-  accentColor?: string
-  /** 停留时长 ms */
-  durationMs?: number
-  /** 位置覆盖 */
-  position?: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' | 'top-center'
-  /** 提示音文件路径或内置音效名 */
-  sound?: string
-  /** 命中后只写入通知中心，不显示桌面弹窗 */
-  muted?: boolean
-}
+// 配置类型与默认值统一维护在 shared/appConfig.ts，这里只保留持久化与加解密逻辑。
+export type { AppConfig as ConfigSchema, NotificationClickBehavior, NotificationFilterMode, NotificationPosition, NotificationStyle, NotifyRule }
 
-export type NotificationPosition = 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' | 'top-center'
-export type NotificationStyle = 'standard' | 'compact' | 'layered' | 'minimal'
-export type ThemeMode = 'light' | 'dark' | 'system'
+type ConfigSchema = AppConfig
 
-export interface ConfigSchema {
-  // 连接
-  dbPath: string
-  decryptKey: string
-  myWxid: string
-  myWxName: string
-  onboardingDone: boolean
-
-  // 通知
-  notificationEnabled: boolean
-  notificationPosition: NotificationPosition
-  notificationStyle: NotificationStyle
-  notificationFilterMode: 'all' | 'whitelist' | 'blacklist'
-  notificationFilterList: string[]
-  mergeWindowMs: number
-  soundEnabled: boolean
-  notificationDurationMs: number
-  notificationOpacity: number
-  showNotificationSummary: boolean
-  notificationClickBehavior: 'open-app' | 'open-wechat' | 'none'
-
-  // 规则
-  notifyRules: NotifyRule[]
-
-  // 通知中心
-  notifyCenterEnabled: boolean
-
-  // 系统
-  startupEnabled: boolean
-  closeToTray: boolean
-  trayNotifications: boolean
-  autoReconnect: boolean
-  reconnectIntervalSeconds: number
-  historyRetentionDays: number
-  autoCleanupHistory: boolean
-}
-
-const DEFAULTS: ConfigSchema = {
-  dbPath: '',
-  decryptKey: '',
-  myWxid: '',
-  myWxName: '',
-  onboardingDone: false,
-
-  notificationEnabled: true,
-  notificationPosition: 'top-right',
-  notificationStyle: 'standard',
-  notificationFilterMode: 'all',
-  notificationFilterList: [],
-  mergeWindowMs: 3500,
-  soundEnabled: true,
-  notificationDurationMs: 5000,
-  notificationOpacity: 90,
-  showNotificationSummary: true,
-  notificationClickBehavior: 'open-app',
-
-  notifyRules: [],
-
-  notifyCenterEnabled: true,
-
-  startupEnabled: true,
-  closeToTray: true,
-  trayNotifications: true,
-  autoReconnect: true,
-  reconnectIntervalSeconds: 3,
-  historyRetentionDays: 30,
-  autoCleanupHistory: true
-}
+const DEFAULTS: ConfigSchema = DEFAULT_CONFIG
 
 // 敏感字段：decryptKey 用 safeStorage 加密存储
 const ENCRYPTED_KEYS = new Set(['decryptKey'])

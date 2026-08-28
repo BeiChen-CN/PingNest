@@ -1,5 +1,13 @@
-export type NotificationPosition = 'top-center' | 'top-right' | 'bottom-right' | 'top-left' | 'bottom-left'
-export type NotificationStyle = 'standard' | 'compact' | 'layered' | 'minimal'
+/**
+ * 通知弹窗的几何与归一化逻辑：主进程用它在多显示器上定位窗口，
+ * 渲染层用它在测量后上报窗口尺寸，测试直接验证纯函数——
+ * 三方必须使用同一份实现，否则样式改了尺寸表没改，弹窗就会被裁剪或留白。
+ * 修改尺寸时需同步 NotificationToast.scss 中对应样式类的宽度。
+ */
+
+import type { NotificationPosition, NotificationStyle } from './appConfig'
+
+export type { NotificationPosition, NotificationStyle } from './appConfig'
 
 export interface NotificationWorkArea {
   x: number

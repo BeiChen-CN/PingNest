@@ -1,43 +1,16 @@
 export type PageId = 'overview' | 'history' | 'rules' | 'appearance' | 'settings' | 'about'
-export type NotificationStyle = 'standard' | 'compact' | 'layered' | 'minimal'
 
-export interface NotifyRule {
-  id: string
-  name: string
-  enabled: boolean
-  muted: boolean
-  sessionIds: string[]
-  keywords: string[]
-  matchMode: 'any' | 'all'
-}
-
-export interface AppConfig {
-  dbPath: string
-  decryptKey: string
-  myWxid: string
-  myWxName: string
-  onboardingDone: boolean
-  notificationEnabled: boolean
-  notificationPosition: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' | 'top-center'
-  notificationStyle: NotificationStyle
-  notificationFilterMode: 'all' | 'whitelist' | 'blacklist'
-  notificationFilterList: string[]
-  mergeWindowMs: number
-  soundEnabled: boolean
-  notificationDurationMs: number
-  notificationOpacity: number
-  showNotificationSummary: boolean
-  notificationClickBehavior: 'open-app' | 'open-wechat' | 'none'
-  notifyRules: NotifyRule[]
-  notifyCenterEnabled: boolean
-  startupEnabled: boolean
-  closeToTray: boolean
-  trayNotifications: boolean
-  autoReconnect: boolean
-  reconnectIntervalSeconds: number
-  historyRetentionDays: number
-  autoCleanupHistory: boolean
-}
+// 配置类型与默认值统一维护在 shared/appConfig.ts（与主进程持久化 schema 同源）。
+import { DEFAULT_CONFIG, type AppConfig } from '../../../shared/appConfig'
+export { DEFAULT_CONFIG }
+export type {
+  AppConfig,
+  NotificationClickBehavior,
+  NotificationFilterMode,
+  NotificationPosition,
+  NotificationStyle,
+  NotifyRule
+} from '../../../shared/appConfig'
 
 export interface AppStatus {
   connected: boolean
@@ -81,15 +54,4 @@ export const PAGE_PATHS: Record<PageId, string> = {
   appearance: '/appearance',
   settings: '/settings',
   about: '/about'
-}
-
-export const DEFAULT_CONFIG: AppConfig = {
-  dbPath: '', decryptKey: '', myWxid: '', myWxName: '', onboardingDone: false,
-  notificationEnabled: true,
-  notificationPosition: 'top-right', notificationStyle: 'standard', notificationFilterMode: 'all', notificationFilterList: [],
-  mergeWindowMs: 3500, soundEnabled: true, notificationDurationMs: 5000,
-  notificationOpacity: 90, showNotificationSummary: true,
-  notificationClickBehavior: 'open-app', notifyRules: [], notifyCenterEnabled: true,
-  startupEnabled: true, closeToTray: true, trayNotifications: true, autoReconnect: true,
-  reconnectIntervalSeconds: 3, historyRetentionDays: 30, autoCleanupHistory: true
 }

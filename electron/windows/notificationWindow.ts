@@ -8,7 +8,7 @@ import {
   normalizeNotificationStyle,
   type NotificationPosition,
   type NotificationWorkArea
-} from './notificationLayout'
+} from '../../shared/notificationMetrics'
 
 let notificationWindow: BrowserWindow | null = null
 let lastNotificationData: any = null
