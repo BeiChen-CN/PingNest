@@ -40,7 +40,7 @@ export function destroyNotificationWindow(): void {
   notificationWindow = null
   try {
     win.destroy()
-  } catch { }
+  } catch { /* 窗口可能已被系统销毁 */ }
 }
 
 function createNotificationWindow(): BrowserWindow | null {

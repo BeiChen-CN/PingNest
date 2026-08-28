@@ -24,7 +24,7 @@ function encryptValue(key: string, value: unknown): unknown {
     if (safeStorage.isEncryptionAvailable()) {
       return 'enc:' + safeStorage.encryptString(value).toString('base64')
     }
-  } catch { }
+  } catch { /* 系统不支持加密时按明文存储（decryptValue 侧有对应回退） */ }
   return value
 }
 

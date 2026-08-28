@@ -45,7 +45,7 @@ function getKeyViaWorker(
     const timer = setTimeout(() => {
       if (settled) return
       settled = true
-      try { worker.kill() } catch { }
+      try { worker.kill() } catch { /* 尽力终止：密钥进程可能已自行退出 */ }
       resolve({ success: false, error: '获取密钥超时（进程无响应）' })
     }, timeoutMs + 8000)
 
@@ -57,7 +57,7 @@ function getKeyViaWorker(
         if (settled) return
         settled = true
         clearTimeout(timer)
-        try { worker.kill() } catch { }
+        try { worker.kill() } catch { /* 尽力终止：密钥进程可能已自行退出 */ }
         resolve(msg.result || { success: false, error: '密钥进程返回空结果' })
       }
     })

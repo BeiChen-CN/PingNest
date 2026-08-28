@@ -48,7 +48,7 @@ export class NotifyCenterStore {
     } catch (e) {
       // 解密失败或文件损坏：备份原文件，避免覆盖不可恢复数据
       console.error('[NotifyCenterStore] 读取历史失败（已备份原文件）:', e)
-      try { await fs.rename(this.filePath, this.filePath + '.corrupt-' + Date.now()) } catch { }
+      try { await fs.rename(this.filePath, this.filePath + '.corrupt-' + Date.now()) } catch { /* 备份失败也只能继续：文件不可读 */ }
       this.entries = []
     }
   }
@@ -160,7 +160,7 @@ export class NotifyCenterStore {
       await fs.rename(tempPath, this.filePath)
     } catch (e) {
       console.error('[NotifyCenterStore] 保存失败:', e)
-      try { await fs.rm(tempPath, { force: true }) } catch { }
+      try { await fs.rm(tempPath, { force: true }) } catch { /* 尽力清理临时文件：失败不影响写入结果 */ }
     }
   }
 }

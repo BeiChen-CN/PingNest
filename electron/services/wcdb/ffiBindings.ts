@@ -80,14 +80,14 @@ export class WcdbFfiBindings {
       this.wcdbFreeString(outPtr)
       return jsonStr
     } catch (e) {
-      try { this.wcdbFreeString(outPtr) } catch { }
+      try { this.wcdbFreeString(outPtr) } catch { /* 尽力释放：指针可能已失效 */ }
       return null
     }
   }
 
   freeString(ptr: any): void {
     if (ptr === null || ptr === undefined) return
-    try { this.wcdbFreeString(ptr) } catch { }
+    try { this.wcdbFreeString(ptr) } catch { /* 尽力释放：指针可能已失效 */ }
   }
 
   /** wcdb_shutdown：关闭前必须调用，否则句柄泄漏 */
@@ -296,11 +296,11 @@ export class WcdbFfiBindings {
             const logsRc = this.wcdbGetLogs(outPtr)
             if (logsRc === 0 && outPtr[0]) {
               const jsonStr = this.koffi.decode(outPtr[0], 'char', -1)
-              try { this.wcdbFreeString(outPtr[0]) } catch { }
+              try { this.wcdbFreeString(outPtr[0]) } catch { /* 尽力释放 */ }
               log('[bootstrap] C++ logs: ' + String(jsonStr || '').slice(0, 2000), true)
               console.error('[wcdbCore] C++ logs:', String(jsonStr || '').slice(0, 2000))
             }
-          } catch { }
+          } catch { /* 诊断日志读取失败不影响主流程 */ }
         }
         lastDllInitError = this.formatInitProtectionError(initResult)
         return { ok: false, error: lastDllInitError }

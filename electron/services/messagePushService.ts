@@ -104,6 +104,7 @@ export class MessagePushService extends EventEmitter {
     try {
       payload = JSON.parse(json)
     } catch {
+      // 管道消息可能被按 NUL 分段，解析失败时退回全量同步，无需报错
       payload = null
     }
 

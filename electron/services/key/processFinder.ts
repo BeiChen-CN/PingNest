@@ -63,7 +63,7 @@ export class WeChatProcessFinder {
     let preferredPid: number | null = null
     try {
       preferredPid = await this.findWeChatPid(0)
-    } catch { }
+    } catch { /* 进程查找失败按"无 PID"处理，退回窗口标题匹配 */ }
 
     const candidates: Array<{ hWnd: any; pid: number }> = []
     const enumWindowsCallback = this.win32.registerCallback((hWnd: any) => {

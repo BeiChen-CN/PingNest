@@ -12,7 +12,7 @@ try {
   const p = process.env.WX_KEY_DLL_PATH || ''
   const { existsSync } = require('fs')
   console.error('[keyWorker] WX_KEY_DLL_PATH=' + p + ' exists=' + existsSync(p) + ' cwd=' + process.cwd())
-} catch { }
+} catch { /* 纯诊断输出，失败可忽略 */ }
 
 const parentPort: any = (process as any).parentPort
 if (!parentPort) {

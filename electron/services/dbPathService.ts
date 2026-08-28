@@ -67,7 +67,7 @@ export class DbPathService {
       if (v2.value > 0 && v2.value <= 10000 && offset + v2.value <= buf.length) {
         return buf.toString('utf8', offset, offset + v2.value)
       }
-    } catch { }
+    } catch { /* MMKV 变长字段解析失败按空值处理 */ }
     return ''
   }
 
@@ -121,7 +121,7 @@ export class DbPathService {
                 possiblePaths.push(join(appSupportBase, entry))
               }
             }
-          } catch { }
+          } catch { /* 目录不可读时跳过 macOS 版本化路径探测 */ }
         }
         possiblePaths.push(join(home, 'Library', 'Containers', 'com.tencent.xinWeChat', 'Data', 'Documents', 'xwechat_files'))
       } else {
@@ -154,7 +154,7 @@ export class DbPathService {
         if (!this.isPotentialAccountName(entry)) continue
         if (this.isAccountDir(entryPath)) accounts.push(entry)
       }
-    } catch { }
+    } catch { /* 根目录不可读时按无账号处理 */ }
     return accounts
   }
 
@@ -204,7 +204,7 @@ export class DbPathService {
         const fullPath = join(resolvedRootPath, account)
         wxids.push({ wxid: account, modifiedTime: this.getAccountModifiedTime(fullPath) })
       }
-    } catch { }
+    } catch { /* 目录不可读时返回已收集到的账号 */ }
 
     const sorted = wxids.sort((a, b) => {
       if (b.modifiedTime !== a.modifiedTime) return b.modifiedTime - a.modifiedTime

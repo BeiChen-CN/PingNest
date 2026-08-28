@@ -1,6 +1,7 @@
 import { join } from 'path'
-import { appendFileSync, existsSync, mkdirSync } from 'fs'
+import { existsSync } from 'fs'
 import { tmpdir } from 'os'
+import { configureFileSink, createLogger, writeSinkLine } from '../logger'
 import { resolveSqlMessageSendState } from './messageDirection'
 import { mapSqlMessageContent } from './sqlMessageContent'
 import { cleanAccountDirName, expandHomePath } from './dbPathService'
@@ -11,6 +12,8 @@ import { buildMessageTableExistsSql, buildMessagesByTableSql, buildName2IdRowIdS
 
 // 数据服务初始化错误信息
 let lastDllInitError: string | null = null
+
+const logger = createLogger('wcdbCore')
 
 export function getLastDllInitError(): string | null {
   return lastDllInitError
@@ -64,24 +67,25 @@ export class WcdbCore {
     return process.env.WCDB_LOG_ENABLED === '1' || this.logEnabled
   }
 
+  // wcdb 诊断文件通道（wcdb.log）：只落盘、不打控制台，避免污染主日志。
+  private wcdbSinkReady = false
+
   private writeLog(message: string, force = false): void {
     if (!force && !this.isLogEnabled()) return
-    const line = '[ ' + new Date().toISOString() + '] ' + message
-
-    const candidates: string[] = []
-    if (this.userDataPath) candidates.push(join(this.userDataPath, 'logs', 'wcdb.log'))
-    if (process.env.WCDB_LOG_DIR) candidates.push(join(process.env.WCDB_LOG_DIR, 'logs', 'wcdb.log'))
-    candidates.push(join(process.cwd(), 'logs', 'wcdb.log'))
-    candidates.push(join(tmpdir(), 'pingnest-wcdb.log'))
-
-    for (const filePath of Array.from(new Set(candidates))) {
-      try {
-        const dir = join(filePath, '..')
-        if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-        appendFileSync(filePath, line + '\n', { encoding: 'utf8' })
-        return
-      } catch { }
+    if (!this.wcdbSinkReady) {
+      // 与旧实现一致：userData 优先，其后依次是环境变量目录、cwd、临时目录
+      const candidates: string[] = []
+      if (this.userDataPath) candidates.push(join(this.userDataPath, 'logs'))
+      if (process.env.WCDB_LOG_DIR) candidates.push(join(process.env.WCDB_LOG_DIR, 'logs'))
+      candidates.push(join(process.cwd(), 'logs'))
+      candidates.push(tmpdir())
+      for (const dir of candidates) {
+        if (configureFileSink('wcdb', dir)) break
+      }
+      this.wcdbSinkReady = true
     }
+    writeSinkLine('wcdb', 'wcdb', message)
+    logger.debug(message)
   }
 
   /** 命名管道监控：微信数据库变化时回调 (type, json) */
@@ -107,7 +111,7 @@ export class WcdbCore {
             pipePath = this.ffi.decodeCString(namePtr[0])
             this.ffi.freeString(namePtr[0])
           }
-        } catch { }
+        } catch { /* 取不到管道名时使用默认管道名 */ }
       }
       this.writeLog('[monitor] 管道: ' + pipePath, true)
       this.connectMonitorPipe(pipePath)
@@ -165,7 +169,7 @@ export class WcdbCore {
             const parsed = JSON.parse(tail)
             this.monitorCallback?.(parsed.action || 'update', tail)
             buffer = ''
-          } catch { }
+          } catch { /* 残包不是完整 JSON，留待与下一段拼接 */ }
         }
       })
 
@@ -201,7 +205,7 @@ export class WcdbCore {
       this.monitorPipeClient = null
     }
     if (this.ffi.stopMonitorPipeFn) {
-      try { this.ffi.stopMonitorPipeFn() } catch { }
+      try { this.ffi.stopMonitorPipeFn() } catch { /* 停止监控失败可忽略（进程退出路径） */ }
     }
   }
 
@@ -276,7 +280,7 @@ export class WcdbCore {
       lastDllInitError = null
 
       if (this.ffi.setMyWxidFn && accountWxid) {
-        try { this.ffi.setMyWxidFn(this.handle, accountWxid) } catch { }
+        try { this.ffi.setMyWxidFn(this.handle, accountWxid) } catch { /* 可选接口：失败仅影响群聊成员识别 */ }
       }
       this.writeLog('open ok handle=' + handle, true)
       return true
@@ -289,7 +293,7 @@ export class WcdbCore {
 
   close(): void {
     if (this.handle !== null || this.initialized) {
-      try { this.stopMonitor() } catch { }
+      try { this.stopMonitor() } catch { /* 关闭路径：尽力停止监控 */ }
       this.ffi.shutdown()
       this.handle = null
       this.currentPath = null

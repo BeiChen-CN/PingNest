@@ -140,7 +140,7 @@ export class KeyService {
     if (!ok) {
       // 失败后先尝试清理残留 Hook 状态，再重试一次（多实例并发注入时可能残留）
       onStatus?.('首次注入失败，尝试清理残留状态后重试...', 0)
-      try { this.cleanupHook() } catch { }
+      try { this.cleanupHook() } catch { /* 尽力清理：Hook 未建立时清理失败可忽略 */ }
       await new Promise(resolve => setTimeout(resolve, 400))
       ok = this.initHook(pid)
     }
@@ -186,7 +186,7 @@ export class KeyService {
         await new Promise(resolve => setTimeout(resolve, 120))
       }
     } finally {
-      try { this.cleanupHook() } catch { }
+      try { this.cleanupHook() } catch { /* 尽力清理：Hook 未建立时清理失败可忽略 */ }
     }
 
     const loginRequired = loginRequiredDetected || await this.processFinder.detectWeChatLoginRequired(pid)

@@ -79,7 +79,7 @@ export function resolveDbStoragePath(basePath: string, wxid: string): string | n
         const candidate = join(normalized, entry, 'db_storage')
         if (existsSync(candidate)) return candidate
       }
-    } catch { }
+    } catch { /* 目录扫描失败，交给后续候选路径 */ }
   }
   try {
     let parent = normalized
@@ -94,7 +94,7 @@ export function resolveDbStoragePath(basePath: string, wxid: string): string | n
         if (existsSync(viaWxidUp)) return viaWxidUp
       }
     }
-  } catch { }
+  } catch { /* 逐级向上探测失败，返回 null 由调用方报错 */ }
   return null
 }
 
@@ -115,9 +115,9 @@ export function findSessionDb(dir: string, depth = 0): string | null {
           const found = findSessionDb(fullPath, depth + 1)
           if (found) return found
         }
-      } catch { }
+      } catch { /* 子项不可访问时跳过 */ }
     }
-  } catch { }
+  } catch { /* 目录不可读时视为无 session.db */ }
   return null
 }
 

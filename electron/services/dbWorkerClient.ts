@@ -167,7 +167,7 @@ export class DbWorkerClient {
     if (!worker) return
     try {
       await this.close()
-    } catch { }
+    } catch { /* 尽力关闭：进程可能已退出，dispose 会兜底清理 */ }
     this.dispose(worker)
   }
 
@@ -179,7 +179,7 @@ export class DbWorkerClient {
       this.pending.delete(id)
       p.reject(new Error('数据进程已关闭'))
     }
-    try { target.kill() } catch { }
+    try { target.kill() } catch { /* 尽力终止：进程可能已退出 */ }
   }
 }
 

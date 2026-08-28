@@ -14,6 +14,7 @@ import { registerIpcHandlers } from './ipc'
 import { createTray } from './tray'
 import { connectAndStart, hasSavedHook } from './connection'
 import { cleanupExpiredHistory, syncLoginItemSetting } from './maintenance'
+import { configureFileSink, createLogger } from './logger'
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -21,6 +22,7 @@ let isQuitting = false
 let trayHintShown = false
 let historyFlushedForQuit = false
 let historyCleanupTimer: ReturnType<typeof setInterval> | null = null
+const logger = createLogger('main')
 const launchedAtLogin = process.platform === 'win32' && process.argv.includes('--hidden')
 
 function resolveAppIconPath(): string {
@@ -148,7 +150,7 @@ function handleMessagePush(payload: MessagePushPayload): void {
     clickBehavior: cfg.notificationClickBehavior,
     soundEnabled: cfg.soundEnabled,
     sound: effect.sound
-  }).catch((e) => console.error('[main] showNotification failed:', e))
+  }).catch((e) => logger.error('showNotification failed:', e))
 }
 
 function openMainWindowForNotification(sessionId: string): void {
@@ -172,13 +174,13 @@ function handleNotificationNavigate(sessionId: string): void {
   if (behavior === 'open-wechat') {
     void keyService.focusWeChatWindow().then((focused) => {
       if (focused) {
-        console.info('[main] 通知点击：已激活微信主窗口，会话=' + normalizedSessionId)
+        logger.info('通知点击：已激活微信主窗口，会话=' + normalizedSessionId)
         return
       }
-      console.warn('[main] 通知点击：未找到可激活的微信主窗口，会话=' + normalizedSessionId)
+      logger.warn('通知点击：未找到可激活的微信主窗口，会话=' + normalizedSessionId)
       openMainWindowForNotification(sessionId)
     }).catch(() => {
-      console.warn('[main] 通知点击：激活微信窗口异常，会话=' + normalizedSessionId)
+      logger.warn('通知点击：激活微信窗口异常，会话=' + normalizedSessionId)
       openMainWindowForNotification(sessionId)
     })
     return
@@ -204,6 +206,10 @@ if (!gotSingleInstanceLock) {
     registerNotificationHandlers()
     registerIpcHandlers({ getMainWindow: () => mainWindow })
     await notifyCenterStore.init()
+    // PINGNEST_LOG_FILE=1 时主进程日志落盘到 userData/logs/main.log
+    if (process.env.PINGNEST_LOG_FILE === '1') {
+      configureFileSink('main', join(app.getPath('userData'), 'logs'))
+    }
     cleanupExpiredHistory()
     syncLoginItemSetting()
     historyCleanupTimer = setInterval(() => {
@@ -233,7 +239,7 @@ if (!gotSingleInstanceLock) {
 
     if (hasSavedHook(configService.getAll())) {
       void connectAndStart().then((result) => {
-        if (!result.success) console.warn('[main] 恢复微信监听失败:', result.error)
+        if (!result.success) logger.warn('恢复微信监听失败:', result.error)
       })
     }
 

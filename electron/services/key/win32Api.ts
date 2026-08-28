@@ -80,6 +80,6 @@ export class Win32Api {
   }
 
   unregisterCallback(callback: any): void {
-    try { this.ensureKoffi().unregister(callback) } catch { }
+    try { this.ensureKoffi().unregister(callback) } catch { /* 尽力注销：回调可能已被释放 */ }
   }
 }
