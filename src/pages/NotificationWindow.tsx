@@ -224,7 +224,7 @@ export default function NotificationWindow() {
         <div
           id="notification-prev"
           key={prevNotification.id}
-          className={`notification-position-${position}`}
+          className={`notification-position-${position} notification-style-${prevNotification.notificationStyle || 'standard'}`}
           style={{
             position: 'absolute',
             top: 2,
@@ -249,7 +249,7 @@ export default function NotificationWindow() {
         <div
           id="notification-current"
           key={notification.id}
-          className={`notification-position-${position}`}
+          className={`notification-position-${position} notification-style-${notification.notificationStyle || 'standard'}`}
           style={{
             position: 'relative',
             zIndex: 2,

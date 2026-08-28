@@ -121,12 +121,13 @@ export function NotificationToast({
 
   const isRevoke = data.event === 'message.revoke'
   const isClickable = data.clickBehavior !== 'none'
+  const isMerged = (data.mergeCount || 1) > 1
   const accentColor = /^#[0-9a-f]{6}$/i.test(data.accentColor || '') ? data.accentColor : '#006a6a'
   const progressKey = `${data.id}-${data.receivedAtMs || data.timestamp}`
   const accessibleLabel = isRevoke
     ? `${data.title} 撤回了一条消息`
     : `${data.title} 的通知：${data.content || '无文字内容'}`
-  const notificationStyle = ['compact', 'layered', 'minimal'].includes(data.notificationStyle || '')
+  const notificationStyle = ['compact', 'layered', 'minimal', 'island'].includes(data.notificationStyle || '')
     ? data.notificationStyle
     : 'standard'
   const sessionLabel = isRevoke
@@ -156,7 +157,8 @@ export function NotificationToast({
         (position === 'static' ? ' preview' : '') +
         ` style-${notificationStyle}` +
         (isClickable ? ' clickable' : ' non-clickable') +
-        (isRevoke ? ' revoke' : '')
+        (isRevoke ? ' revoke' : '') +
+        (isMerged ? ' merged' : '')
       }
       style={{ '--nt-accent': accentColor, '--nt-duration': `${Math.max(1000, Number(data.durationMs ?? 5000))}ms`, '--nt-opacity': Math.max(0.7, Math.min(1, Number(data.opacity ?? 100) / 100)) } as React.CSSProperties}
       role="status"

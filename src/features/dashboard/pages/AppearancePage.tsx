@@ -1,4 +1,4 @@
-import { AlignJustify, Bell, Combine, Eye, Layers3, MapPin, Minus, MousePointer2, Rows3, Timer, Volume2 } from 'lucide-react'
+import { AlignJustify, Bell, Combine, Eye, Layers3, MapPin, Minus, MousePointer2, Pill, Rows3, Timer, Volume2 } from 'lucide-react'
 import { NotificationToast } from '../../../components/NotificationToast'
 import { SelectField } from '../components/SelectField'
 import { Switch } from '../components/Switch'
@@ -19,7 +19,8 @@ const NOTIFICATION_STYLES: Array<{
   { id: 'standard', label: '清晰卡片', description: '来源、正文与状态分层', icon: Rows3 },
   { id: 'compact', label: '速览条', description: '单行密度，适合高频提醒', icon: AlignJustify },
   { id: 'layered', label: '重点卡片', description: '更醒目的内容层级', icon: Layers3 },
-  { id: 'minimal', label: '文字提示', description: '去除头像，只保留核心信息', icon: Minus }
+  { id: 'minimal', label: '文字提示', description: '去除头像，只保留核心信息', icon: Minus },
+  { id: 'island', label: '灵动胶囊', description: '深色胶囊，弹出时从中心展开、消失时向中心收起', icon: Pill }
 ]
 
 function SectionHeader({ icon: Icon, title, description }: { icon: typeof Bell; title: string; description: string }) {

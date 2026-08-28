@@ -23,7 +23,7 @@ export function normalizeNotificationPosition(value: unknown): NotificationPosit
 }
 
 export function normalizeNotificationStyle(value: unknown): NotificationStyle {
-  return ['standard', 'compact', 'layered', 'minimal'].includes(String(value))
+  return ['standard', 'compact', 'layered', 'minimal', 'island'].includes(String(value))
     ? value as NotificationStyle
     : 'standard'
 }
@@ -31,6 +31,7 @@ export function normalizeNotificationStyle(value: unknown): NotificationStyle {
 export function calculateNotificationWidth(position: NotificationPosition, style: NotificationStyle): number {
   if (style === 'compact') return 344
   if (style === 'minimal') return 360
+  if (style === 'island') return 380
   if (style === 'layered') return position === 'top-center' ? 400 : 420
   return position === 'top-center' ? 360 : 400
 }
@@ -38,6 +39,7 @@ export function calculateNotificationWidth(position: NotificationPosition, style
 export function calculateNotificationMaxHeight(style: NotificationStyle): number {
   if (style === 'compact') return 96
   if (style === 'minimal') return 92
+  if (style === 'island') return 120
   if (style === 'layered') return 190
   return 180
 }

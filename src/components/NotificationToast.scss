@@ -103,6 +103,34 @@
     .notification-close { top: 50%; right: 8px; transform: translateY(-50%); }
     .notification-progress { height: 1px; opacity: .5; }
   }
+
+  // Island: 灵动胶囊——深色圆胶囊，出现时从中心展开、消失时向中心收起
+  //（动画在 NotificationWindow.scss 中按容器样式类切换）。
+  &.style-island {
+    width: 380px; min-height: 62px; padding: 10px 44px 10px 14px; color: #d9eeea; background: #152420; border: 0; border-radius: 999px; box-shadow: $elevation-3;
+    &::before { display: none; }
+    .notification-content { align-items: center; gap: 10px; }
+    .notification-avatar { padding-top: 0; }
+    .nt-avatar-img, .nt-avatar-fallback { width: 34px !important; height: 34px !important; border-radius: 999px; }
+    .nt-avatar-fallback { color: #9cf1f0; background: #24443f; }
+    .notification-kicker { display: none; }
+    .notification-header { min-height: 18px; margin-bottom: 2px; }
+    .notification-title { color: #ffffff; font-size: $font-size-md; }
+    .notification-time { color: #7fa39d; font-size: $font-size-xs; }
+    .notification-body { display: block; overflow: hidden; color: #b7d2cc; font-size: $font-size-sm; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+    .notification-footer { display: none; }
+    .nt-type-icon, .nt-revoke-icon { color: #5fded9; }
+    // 合并徽标：吸附在胶囊右缘（关闭按钮左侧）的计数胶囊（仅 merged 时出现）
+    &.merged .notification-text { padding-right: 4px; }
+    &.merged .notification-footer {
+      display: flex; position: absolute; top: 50%; right: 38px; min-height: 0; margin: 0; gap: 0;
+      align-items: center; transform: translateY(-50%);
+      > span:not(.nt-merge-badge) { display: none; }
+      .nt-merge-badge { min-width: 24px; height: 24px; padding: 0 7px; color: var(--md-on-primary); background: var(--nt-accent, var(--md-primary)); border-radius: 999px; font-size: $font-size-sm; }
+    }
+    .notification-close { top: 50%; right: 8px; color: #7fa39d; background: rgba(255, 255, 255, .07); transform: translateY(-50%); &:hover, &:focus-visible { color: #fff; background: rgba(255, 255, 255, .16); } }
+    .notification-progress { right: 18px; bottom: 6px; left: 18px; height: 2px; border-radius: 999px; opacity: .8; }
+  }
 }
 
 .notification-toast-container.preview { animation: motion-fade-down $motion-duration-slow $motion-ease-out both; }

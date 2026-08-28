@@ -5,7 +5,8 @@
  */
 
 export type NotificationPosition = 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' | 'top-center'
-export type NotificationStyle = 'standard' | 'compact' | 'layered' | 'minimal'
+/** island：灵动胶囊（居中展开/收起） */
+export type NotificationStyle = 'standard' | 'compact' | 'layered' | 'minimal' | 'island'
 export type NotificationFilterMode = 'all' | 'whitelist' | 'blacklist'
 export type NotificationClickBehavior = 'open-app' | 'open-wechat' | 'none'
 

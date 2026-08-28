@@ -15,7 +15,7 @@ const BOOLEAN_KEYS: ReadonlySet<string> = new Set([
 ])
 
 const NOTIFICATION_POSITIONS: NotificationPosition[] = ['top-right', 'top-left', 'bottom-right', 'bottom-left', 'top-center']
-const NOTIFICATION_STYLES: NotificationStyle[] = ['standard', 'compact', 'layered', 'minimal']
+const NOTIFICATION_STYLES: NotificationStyle[] = ['standard', 'compact', 'layered', 'minimal', 'island']
 
 const validators: Partial<Record<keyof ConfigSchema, Validator>> = {
   reconnectIntervalSeconds: (value) =>

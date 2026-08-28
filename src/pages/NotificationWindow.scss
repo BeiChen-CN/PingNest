@@ -24,6 +24,20 @@
   to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
 }
 
+// 灵动胶囊（island）：出现从中心展开（带回弹），消失从两边向中心收起。
+@keyframes notification-island-enter {
+  0% { opacity: 0; transform: scale(.16, .55); }
+  55% { opacity: 1; transform: scale(1.04, 1.06); }
+  78% { transform: scale(.985, .99); }
+  100% { opacity: 1; transform: scale(1, 1); }
+}
+
+@keyframes notification-island-exit {
+  0% { opacity: 1; transform: scale(1, 1); }
+  32% { opacity: .96; transform: scale(.88, .92); }
+  100% { opacity: 0; transform: scale(.04, .4); }
+}
+
 @keyframes notification-exit-top {
   from { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
   35% { opacity: .88; transform: translate3d(0, 1px, 0) scale(.998); }
@@ -103,6 +117,27 @@ html > body {
 
 #notification-prev.notification-position-bottom-right,
 #notification-prev.notification-position-bottom-left { transform-origin: center bottom; }
+
+// ---------- 灵动胶囊样式动画 ----------
+// 放在位置规则之后：同优先级下按源顺序覆盖 animation-name，
+// 进/出场都以胶囊自身中心为原点，与位置无关。
+#notification-current.notification-style-island,
+#notification-prev.notification-style-island {
+  transform-origin: 50% 50%;
+}
+
+#notification-current.notification-style-island {
+  animation-name: notification-island-enter;
+  animation-duration: 440ms;
+  animation-timing-function: cubic-bezier(.3, .9, .35, 1);
+}
+
+// 收起必须在 260ms（NOTIFICATION_EXIT_MS，窗口关闭）内完成
+#notification-prev.notification-style-island {
+  animation-name: notification-island-exit;
+  animation-duration: 240ms;
+  animation-timing-function: cubic-bezier(.55, 0, .75, .35);
+}
 
 @media (prefers-reduced-motion: reduce) {
   #notification-current, #notification-prev {

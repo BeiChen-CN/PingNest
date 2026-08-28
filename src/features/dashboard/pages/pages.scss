@@ -553,6 +553,25 @@
   &.preview-compact { padding: 6px 8px; i { &:nth-child(2), &:nth-child(3) { display: none; } } }
   &.preview-layered { background: var(--md-secondary-container); i:first-child { background: var(--md-primary); } }
   &.preview-minimal { background: transparent; border: 1px solid var(--md-outline-variant); i { &:nth-child(2), &:nth-child(3) { display: none; } } }
+  // 灵动胶囊：深色圆胶囊（圆点头像 + 单行文字）
+  &.preview-island {
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 10px;
+    background: #152420;
+    border-radius: 999px;
+    i {
+      flex: 0 0 auto;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #5fded9;
+      &:first-child { width: 9px; }
+      &:nth-child(2) { flex: 1; width: auto; height: 4px; border-radius: 2px; background: #b7d2cc; }
+      &:nth-child(3) { display: none; }
+    }
+  }
 }
 
 .preview-canvas {
