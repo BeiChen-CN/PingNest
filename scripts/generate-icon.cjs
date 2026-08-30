@@ -9,7 +9,7 @@
  */
 const path = require('node:path')
 const fs = require('node:fs')
-const Jimp = require('jimp')
+const { Jimp, ResizeStrategy, JimpMime } = require('jimp')
 const pngToIco = require('png-to-ico')
 
 const SOURCE = path.join(__dirname, 'icon-source.png')
@@ -82,15 +82,15 @@ async function main() {
   floodFillBackground(image)
   clearNearWhiteRim(image)
 
-  const png512 = image.clone().resize(512, 512, Jimp.RESIZE_BICUBIC)
-  fs.writeFileSync(OUT_PNG, await png512.getBufferAsync(Jimp.MIME_PNG))
+  const png512 = image.clone().resize({ w: 512, h: 512, mode: ResizeStrategy.BICUBIC })
+  fs.writeFileSync(OUT_PNG, await png512.getBuffer(JimpMime.png))
   console.log('[generate-icon] wrote ' + OUT_PNG)
 
   const sizes = [16, 24, 32, 48, 64, 128, 256]
   const pngBuffers = []
   for (const size of sizes) {
-    const resized = image.clone().resize(size, size, Jimp.RESIZE_BICUBIC)
-    pngBuffers.push(await resized.getBufferAsync(Jimp.MIME_PNG))
+    const resized = image.clone().resize({ w: size, h: size, mode: ResizeStrategy.BICUBIC })
+    pngBuffers.push(await resized.getBuffer(JimpMime.png))
   }
   const ico = await pngToIco(pngBuffers)
   fs.writeFileSync(OUT_ICO, ico)

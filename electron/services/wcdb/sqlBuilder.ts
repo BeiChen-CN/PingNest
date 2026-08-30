@@ -25,8 +25,15 @@ export function buildName2IdRowIdSql(username: string): string {
   return 'SELECT rowid FROM Name2Id WHERE user_name = \'' + String(username).replace(/'/g, "''") + '\' LIMIT 1'
 }
 
-export function buildName2IdUsernameSql(realSenderId: number): string {
-  return 'SELECT user_name FROM Name2Id WHERE rowid = ' + Math.floor(Number(realSenderId) || 0) + ' LIMIT 1'
+/** 批量反查：rowid 集合 → user_name。入参被收敛为正整数集合，无注入面；空集返回空串（调用方跳过查询）。 */
+export function buildName2IdUsernamesSql(realSenderIds: number[]): string {
+  const ids = Array.from(new Set(
+    realSenderIds
+      .map((id) => Math.floor(Number(id) || 0))
+      .filter((id) => id > 0)
+  ))
+  if (ids.length === 0) return ''
+  return 'SELECT rowid, user_name FROM Name2Id WHERE rowid IN (' + ids.join(',') + ')'
 }
 
 /**

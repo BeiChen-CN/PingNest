@@ -5,9 +5,9 @@ import { dbPathService } from './services/dbPathService'
 import { keyService } from './services/keyService'
 import { chatService } from './services/chatService'
 import { messagePushService } from './services/messagePushService'
-import { notifyCenterStore } from './services/notifyCenterStore'
+import { notifyCenterStore, type NotifyCenterEntry } from './services/notifyCenterStore'
 import { normalizeDisplayName } from './services/displayName'
-import { broadcastNotifyCenter } from './notifyBroadcast'
+import { broadcastNotifyCenterPatch } from './notifyBroadcast'
 
 export type HookStage = 'detecting' | 'waiting-wechat' | 'hooking' | 'verifying' | 'success' | 'error'
 export interface HookProgress {
@@ -27,6 +27,13 @@ function resolveKeyDllPath(): string {
   return join(__dirname, '..', 'resources', 'key', 'win32', 'x64', 'wx_key.dll')
 }
 
+function resolveDllManifestPath(): string {
+  if (app.isPackaged) {
+    return join(process.resourcesPath as string, 'resources', 'dll-manifest.json')
+  }
+  return join(__dirname, '..', 'resources', 'dll-manifest.json')
+}
+
 function getKeyViaWorker(
   timeoutMs: number,
   onStatus?: (message: string, level: number) => void
@@ -38,6 +45,7 @@ function getKeyViaWorker(
       env: {
         ...process.env,
         WX_KEY_DLL_PATH: resolveKeyDllPath(),
+        WX_DLL_MANIFEST_PATH: resolveDllManifestPath(),
         APP_IS_PACKAGED: app.isPackaged ? 'true' : 'false'
       }
     })
@@ -46,7 +54,7 @@ function getKeyViaWorker(
       if (settled) return
       settled = true
       try { worker.kill() } catch { /* 尽力终止：密钥进程可能已自行退出 */ }
-      resolve({ success: false, error: '获取密钥超时（进程无响应）' })
+      resolve({ success: false, error: '获取密钥超时：密钥进程长时间无响应。\n\n请完全退出微信（托盘右键 → 退出）后重新打开并登录，再重试连接。' })
     }, timeoutMs + 8000)
 
     worker.on('message', (msg: any) => {
@@ -66,7 +74,7 @@ function getKeyViaWorker(
       clearTimeout(timer)
       if (!settled) {
         settled = true
-        resolve({ success: false, error: '密钥进程异常退出' })
+        resolve({ success: false, error: '密钥进程异常退出（可能被安全软件终止）。\n\n请检查杀毒软件是否拦截 PingNest 组件，将其加入信任后重试。' })
       }
     })
 
@@ -127,13 +135,13 @@ async function backfillGroupNames(): Promise<void> {
       .filter((entry) => entry.payload?.sessionType === 'group' && entry.payload?.sessionId)
       .map((entry) => String(entry.payload.sessionId))
   )
-  let changed = false
+  const updatedEntries: NotifyCenterEntry[] = []
   for (const sessionId of groupIds) {
     const groupInfo = await chatService.getContactAvatar(sessionId)
     const groupName = groupInfo?.displayName
-    if (groupName) changed = notifyCenterStore.updateGroupName(sessionId, groupName) || changed
+    if (groupName) updatedEntries.push(...notifyCenterStore.updateGroupName(sessionId, groupName))
   }
-  if (changed) broadcastNotifyCenter()
+  if (updatedEntries.length > 0) broadcastNotifyCenterPatch({ updated: updatedEntries })
 }
 
 export async function hookAndConnect(onProgress?: (progress: HookProgress) => void): Promise<{ success: boolean; error?: string; account?: string }> {

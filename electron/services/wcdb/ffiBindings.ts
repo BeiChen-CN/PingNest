@@ -1,6 +1,7 @@
 import { existsSync } from 'fs'
 import { dirname, join } from 'path'
 import { getWcdbDllPath, preloadDependencyPaths } from './paths'
+import { formatIntegrityError, verifyResourceFile } from '../dllIntegrity'
 
 export type WcdbLogFn = (message: string, force?: boolean) => void
 
@@ -37,6 +38,10 @@ export class WcdbFfiBindings {
   private wcdbStartMonitorPipe: any = null
   private wcdbStopMonitorPipe: any = null
   private wcdbGetMonitorPipeName: any = null
+  // 伴生监控库 pingnest_monitor.dll（可选）：wcdb_api.dll 缺少管道导出时的替代通道
+  private companionLib: any = null
+  private companionStart: any = null
+  private companionStop: any = null
 
   get openAccount(): any { return this.wcdbOpenAccount }
   get getSessionsFn(): any { return this.wcdbGetSessions }
@@ -53,6 +58,8 @@ export class WcdbFfiBindings {
   get startMonitorPipeFn(): any { return this.wcdbStartMonitorPipe }
   get stopMonitorPipeFn(): any { return this.wcdbStopMonitorPipe }
   get getMonitorPipeNameFn(): any { return this.wcdbGetMonitorPipeName }
+  get companionStartFn(): any { return this.companionStart }
+  get companionStopFn(): any { return this.companionStop }
   get setMyWxidFn(): any { return this.wcdbSetMyWxid }
 
   formatInitProtectionError(code: number): string {
@@ -108,6 +115,81 @@ export class WcdbFfiBindings {
     }
   }
 
+  /** win32 加载前的完整性校验：主库与两个依赖 DLL 任一不过 SHA256 清单即拒载 */
+  private verifyWin32Resources(resourcesPath: string | null, dllPath: string): string | null {
+    const manifestPath = this.resolveManifestPath(resourcesPath, dllPath)
+    if (!manifestPath) {
+      return formatIntegrityError('完整性清单不存在（已尝试: ' + this.manifestCandidates(resourcesPath, dllPath).join(' | ') + '）。请在项目根目录运行 npm install 或 npm run dev 重新生成')
+    }
+    const apiCheck = verifyResourceFile(manifestPath, 'wcdb/win32/x64/wcdb_api.dll', dllPath)
+    if (!apiCheck.ok) return formatIntegrityError(apiCheck.detail || '未知原因')
+    for (const dep of preloadDependencyPaths(dllPath)) {
+      if (!existsSync(dep)) continue
+      const manifestKey = dep.toLowerCase().endsWith('wcdb.dll')
+        ? 'wcdb/win32/x64/WCDB.dll'
+        : 'wcdb/win32/x64/SDL2.dll'
+      const depCheck = verifyResourceFile(manifestPath, manifestKey, dep)
+      if (!depCheck.ok) return formatIntegrityError(depCheck.detail || '未知原因')
+    }
+    return null
+  }
+
+  // 清单与 resources/ 目录同级。按候选顺序解析：
+  // ① 传入的资源根（打包版 = <安装>/resources）；② DLL 自身向上三级（wcdb/win32/x64 → resources），
+  //    兼容 DLL 经 WCDB_DLL_PATH/env 指到别处的场景；③ 开发态项目根 resources/。
+  private manifestCandidates(resourcesPath: string | null, dllPath: string): string[] {
+    return [
+      resourcesPath ? join(resourcesPath, 'dll-manifest.json') : null,
+      join(dirname(dllPath), '..', '..', '..', 'dll-manifest.json'),
+      join(process.cwd(), 'resources', 'dll-manifest.json')
+    ].filter((candidate): candidate is string => !!candidate)
+  }
+
+  private resolveManifestPath(resourcesPath: string | null, dllPath: string): string | null {
+    return this.manifestCandidates(resourcesPath, dllPath).find((candidate) => existsSync(candidate)) || null
+  }
+
+  /**
+   * 伴生监控库加载（可选能力，任何失败都只降级轮询，不阻断主库初始化）：
+   * wcdb_api.dll 未导出监控管道接口时，尝试加载同目录的 pingnest_monitor.dll
+   * （ReadDirectoryChangesW 目录监视 + 命名管道推送）。同样先过 SHA256 清单再 koffi.load。
+   * 管道名由 start 的 suffix 参数决定、两侧规则一致，因此无需绑定 pipe_name 查询接口。
+   */
+  private tryLoadMonitorCompanion(resourcesPath: string | null, dllPath: string, log: WcdbLogFn): void {
+    try {
+      if (process.platform !== 'win32') return
+      const companionPath = join(dirname(dllPath), 'pingnest_monitor.dll')
+      if (!existsSync(companionPath)) {
+        console.info('[wcdbCore] 监控伴生库不存在，消息检测使用本地轮询通道')
+        log('[bootstrap] 监控伴生库不存在（可选），消息检测将使用本地轮询通道', true)
+        return
+      }
+      const manifestPath = this.resolveManifestPath(resourcesPath, dllPath)
+      if (!manifestPath) {
+        console.warn('[wcdbCore] 完整性清单不存在，监控伴生库跳过，消息检测使用本地轮询通道')
+        log('[bootstrap] 跳过监控伴生库：完整性清单不存在（可选能力，降级轮询）', true)
+        return
+      }
+      const check = verifyResourceFile(manifestPath, 'wcdb/win32/x64/pingnest_monitor.dll', companionPath)
+      if (!check.ok) {
+        console.warn('[wcdbCore] 监控伴生库完整性校验失败，消息检测使用本地轮询通道: ' + (check.detail || '未知原因'))
+        log('[bootstrap] 监控伴生库完整性校验失败（可选能力，降级轮询）: ' + (check.detail || '未知原因'), true)
+        return
+      }
+      this.companionLib = this.koffi.load(companionPath)
+      this.companionStart = this.companionLib.func('int32 pingnest_monitor_start(const char* watch_dir, const char* pipe_suffix)')
+      this.companionStop = this.companionLib.func('int32 pingnest_monitor_stop()')
+      console.info('[wcdbCore] 监控伴生库 pingnest_monitor.dll 已启用，数据库变更将实时推送')
+      log('[bootstrap] 监控伴生库已加载: ' + companionPath, true)
+    } catch (e) {
+      this.companionLib = null
+      this.companionStart = null
+      this.companionStop = null
+      console.warn('[wcdbCore] 监控伴生库加载失败，消息检测使用本地轮询通道: ' + String(e))
+      log('[bootstrap] 监控伴生库加载失败（可选能力，降级轮询）: ' + String(e), true)
+    }
+  }
+
   /**
    * 加载 DLL、探测 ABI 并执行 wcdb_init。
    * 返回 ok=false 时 error 已是面向用户的中文错误信息。
@@ -123,6 +205,16 @@ export class WcdbFfiBindings {
         console.error('[wcdbCore] WCDB数据服务不存在:', dllPath)
         lastDllInitError = '数据服务不存在: ' + dllPath
         return { ok: false, error: lastDllInitError }
+      }
+
+      // 完整性校验先于任何 koffi.load：被替换/损坏的 DLL 一律拒载
+      if (process.platform === 'win32') {
+        const integrityError = this.verifyWin32Resources(resourcesPath, dllPath)
+        if (integrityError) {
+          lastDllInitError = integrityError
+          log('[bootstrap] integrity check failed: ' + integrityError, true)
+          return { ok: false, error: lastDllInitError }
+        }
       }
 
       // 预加载依赖库（WCDB.dll / SDL2.dll / libWCDB.dylib）
@@ -274,11 +366,14 @@ export class WcdbFfiBindings {
         this.wcdbStopMonitorPipe = this.lib.func('void wcdb_stop_monitor_pipe()')
         this.wcdbGetMonitorPipeName = this.lib.func('int32 wcdb_get_monitor_pipe_name(_Out_ void** outName)')
       } catch (e) {
-        console.warn('[wcdbCore] 监控管道函数加载失败:', e)
+        // 可选能力，不是故障：部分 wcdb_api.dll 构建未导出管道接口，
+        // 置空后先尝试伴生监控库（tryLoadMonitorCompanion），不行再降级轮询。
+        console.info('[wcdbCore] wcdb_api.dll 未内置监控管道接口（可选），尝试伴生监控库')
         this.wcdbStartMonitorPipe = null
         this.wcdbStopMonitorPipe = null
         this.wcdbGetMonitorPipeName = null
       }
+      if (!this.wcdbStartMonitorPipe) this.tryLoadMonitorCompanion(resourcesPath, dllPath, log)
 
       try {
         this.wcdbGetLogs = this.lib.func('int32 wcdb_get_logs(_Out_ void** outJson)')

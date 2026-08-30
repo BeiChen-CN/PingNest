@@ -1,20 +1,23 @@
-import { app, BrowserWindow, Notification as SystemNotification } from 'electron'
+import { app, BrowserWindow, Notification as SystemNotification, nativeTheme } from 'electron'
 import type { Tray } from 'electron'
 import { join } from 'path'
 import { existsSync } from 'fs'
 import { configService, getPublicConfig } from './services/config'
+import { notificationScaleFactor } from '../shared/notificationMetrics'
 import { chatService } from './services/chatService'
 import { messagePushService, type MessagePushPayload } from './services/messagePushService'
-import { ruleEngine } from './rules/ruleEngine'
+import { RuleEngine } from './rules/ruleEngine'
 import { keyService } from './services/keyService'
-import { registerNotificationHandlers, destroyNotificationWindow, setNotificationNavigateHandler, showNotification } from './windows/notificationWindow'
+import { registerNotificationHandlers, destroyNotificationWindow, setNotificationNavigateHandler, showNotification, getNotificationWindow } from './windows/notificationWindow'
+import { applyWebHardening } from './windows/webSecurity'
 import { notifyCenterStore } from './services/notifyCenterStore'
-import { broadcastNotifyCenter } from './notifyBroadcast'
+import { broadcastNotifyCenterPatch } from './notifyBroadcast'
 import { registerIpcHandlers } from './ipc'
 import { createTray } from './tray'
 import { connectAndStart, hasSavedHook } from './connection'
 import { cleanupExpiredHistory, syncLoginItemSetting } from './maintenance'
 import { configureFileSink, createLogger } from './logger'
+import { IPC_CHANNELS } from '../shared/ipcChannels'
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -23,12 +26,20 @@ let trayHintShown = false
 let historyFlushedForQuit = false
 let historyCleanupTimer: ReturnType<typeof setInterval> | null = null
 const logger = createLogger('main')
+// 规则引擎单例在入口组装（ruleEngine 模块保持零 electron 依赖以便单测）
+const ruleEngine = new RuleEngine(configService)
 const launchedAtLogin = process.platform === 'win32' && process.argv.includes('--hidden')
 
 function resolveAppIconPath(): string {
   return app.isPackaged
     ? join(process.resourcesPath, 'icon.ico')
     : join(__dirname, '../public/icon.ico')
+}
+
+// 深色模式跟随系统（UX-04）：渲染层走 CSS prefers-color-scheme token 覆盖，
+// 这里只负责原生窗口背景色（避免暗色系统下窗口加载瞬间的白闪）。
+function windowBackgroundColor(): string {
+  return nativeTheme.shouldUseDarkColors ? '#14170f' : '#f3f1e6'
 }
 
 // ---------- 主窗口 ----------
@@ -40,16 +51,19 @@ function createMainWindow(): BrowserWindow {
     minWidth: 960,
     minHeight: 640,
     frame: false,
-    backgroundColor: '#F6F8F7',
+    backgroundColor: windowBackgroundColor(),
     show: !launchedAtLogin,
     title: 'PingNest',
     icon: resolveAppIconPath(),
     webPreferences: {
       preload: join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      sandbox: true
     }
   })
+
+  applyWebHardening(win)
 
   const devUrl = process.env.VITE_DEV_SERVER_URL
   if (devUrl) {
@@ -112,14 +126,14 @@ function handleMessagePush(payload: MessagePushPayload): void {
 
   // 通知中心记录（持久化）
   if (cfg.notifyCenterEnabled) {
-    notifyCenterStore.add({
+    const entry = notifyCenterStore.add({
       id: 'nc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
       payload: payload as unknown as Record<string, unknown>,
       effect: (effect || {}) as Record<string, unknown>,
       receivedAt: Date.now(),
       read: false
     })
-    broadcastNotifyCenter()
+    broadcastNotifyCenterPatch({ added: [entry] })
   }
 
   // 弹窗
@@ -136,6 +150,7 @@ function handleMessagePush(payload: MessagePushPayload): void {
     sessionId: payload.sessionId,
     sessionType: payload.sessionType,
     title,
+    groupName: payload.groupName,
     content: payload.content,
     avatarUrl: payload.avatarUrl,
     timestamp: payload.timestamp,
@@ -149,7 +164,10 @@ function handleMessagePush(payload: MessagePushPayload): void {
     showSummary: cfg.showNotificationSummary,
     clickBehavior: cfg.notificationClickBehavior,
     soundEnabled: cfg.soundEnabled,
-    sound: effect.sound
+    sound: effect.sound,
+    queueSize: cfg.notificationQueueSize,
+    cardSize: cfg.notificationSize,
+    sizeScale: notificationScaleFactor(cfg.notificationSize)
   }).catch((e) => logger.error('showNotification failed:', e))
 }
 
@@ -158,14 +176,14 @@ function openMainWindowForNotification(sessionId: string): void {
   if (win.isMinimized()) win.restore()
   win.show()
   win.focus()
-  win.webContents.send('navigate-to-session', sessionId)
+  win.webContents.send(IPC_CHANNELS.navigateToSession, sessionId)
 }
 
 function handleNotificationNavigate(sessionId: string): void {
   const normalizedSessionId = String(sessionId || '').trim()
   if (normalizedSessionId) {
-    notifyCenterStore.markSessionRead(normalizedSessionId)
-    broadcastNotifyCenter()
+    const updated = notifyCenterStore.markSessionRead(normalizedSessionId)
+    if (updated.length > 0) broadcastNotifyCenterPatch({ updated })
   }
 
   const behavior = configService.get('notificationClickBehavior')
@@ -213,7 +231,8 @@ if (!gotSingleInstanceLock) {
     cleanupExpiredHistory()
     syncLoginItemSetting()
     historyCleanupTimer = setInterval(() => {
-      if (cleanupExpiredHistory() > 0) broadcastNotifyCenter()
+      const removed = cleanupExpiredHistory()
+      if (removed.length > 0) broadcastNotifyCenterPatch({ removedIds: removed.map((entry) => entry.id) })
     }, 60 * 60 * 1000)
     mainWindow = createMainWindow()
     tray = createTray({
@@ -243,10 +262,22 @@ if (!gotSingleInstanceLock) {
       })
     }
 
-    app.on('activate', () => {
-      ensureMainWindow()
-    })
+  app.on('activate', () => {
+    ensureMainWindow()
   })
+
+  // 系统主题切换：已存在的窗口同步背景色。
+  // 注意必须排除透明通知窗口——setBackgroundColor 会把 transparent 窗口变成
+  // 不透明（浅色主题下就是一层白色画布，圆角卡片四角露白）。
+  nativeTheme.on('updated', () => {
+    const color = windowBackgroundColor()
+    const transparentNotification = getNotificationWindow()
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (win.isDestroyed() || win === transparentNotification) continue
+      try { win.setBackgroundColor(color) } catch { /* 个别窗口类型不支持时忽略 */ }
+    }
+  })
+})
 
   app.on('before-quit', (event) => {
     isQuitting = true
@@ -272,5 +303,7 @@ if (!gotSingleInstanceLock) {
 app.on('quit', () => {
   messagePushService.stop()
   void chatService.close()
+  // 关闭 SQLite 句柄触发 WAL checkpoint，减少 -wal 文件残留
+  notifyCenterStore.close()
   destroyNotificationWindow()
 })

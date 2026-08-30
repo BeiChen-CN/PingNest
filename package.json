@@ -1,6 +1,6 @@
 {
   "name": "pingnest",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "PingNest",
   "main": "dist-electron/main.js",
   "engines": {
@@ -12,11 +12,12 @@
   "scripts": {
     "postinstall": "electron-builder install-app-deps && node scripts/prepare-electron-runtime.cjs",
     "dev": "node scripts/prepare-electron-runtime.cjs && vite --mode electron",
-    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/message-baseline.test.mjs tests/notification-layout.test.mjs tests/display-name.test.mjs tests/history-grouping.test.mjs tests/sql-message-content.test.mjs tests/message-revoke.test.mjs tests/message-dedupe.test.mjs tests/sql-builder.test.mjs",
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test tests/message-baseline.test.mjs tests/notification-layout.test.mjs tests/display-name.test.mjs tests/history-grouping.test.mjs tests/sql-message-content.test.mjs tests/message-revoke.test.mjs tests/message-dedupe.test.mjs tests/sql-builder.test.mjs tests/config-validation.test.mjs tests/message-push-core.test.mjs tests/db-worker-client.test.mjs tests/rule-engine.test.mjs tests/notify-center-store.test.mjs tests/monitor-companion.test.mjs",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
-    "build": "tsc && vite build && electron-builder",
+    "build": "tsc && vite build && node scripts/prepare-electron-runtime.cjs && node scripts/generate-licenses.cjs && electron-builder",
     "preview": "vite preview",
-    "icon": "node scripts/generate-icon.cjs"
+    "icon": "node scripts/generate-icon.cjs",
+    "licenses": "node scripts/generate-licenses.cjs"
   },
   "dependencies": {
     "electron-store": "^11.0.2",
@@ -35,7 +36,7 @@
     "7zip-bin": "^5.2.0",
     "electron": "^41.1.1",
     "electron-builder": "^26.8.1",
-    "jimp": "^0.22.12",
+    "jimp": "^1.6.1",
     "png-to-ico": "^2.1.8",
     "sass": "^1.98.0",
     "typescript": "^6.0.2",
@@ -110,6 +111,7 @@
       "resources/key/**/*"
     ],
     "electronDist": "node_modules/electron/dist",
-    "electronVersion": "41.10.6"
+    "electronVersion": "41.10.6",
+    "afterAllArtifactBuild": "scripts/generate-release-hashes.cjs"
   }
 }

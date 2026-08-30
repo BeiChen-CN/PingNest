@@ -1,3 +1,4 @@
+import { app } from 'electron'
 import { dbWorkerClient } from './dbWorkerClient'
 import { ConfigService } from './config'
 import { cleanAccountDirName } from './dbPathService'
@@ -43,9 +44,18 @@ export class ChatService {
   private connected = false
   private avatarCache = new Map<string, AvatarCacheEntry>()
   private readonly avatarCacheTtlMs = 10 * 60 * 1000
+  /** 缓存条目数软上限：超过后顺手清理过期项（读取时已有 TTL 判断，这里防 Map 只增不减） */
+  private readonly avatarCacheSoftLimit = 500
   private monitorStarted = false
 
-  constructor(private configService: ConfigService) { }
+  constructor(private configService: ConfigService) {
+    // worker 进程退出后，其内的监控与数据库句柄全部消失；若不复位这两个标志，
+    // 重建 worker 后 startMonitor 会被跳过，原生监控将永久失效（只剩轮询兜底）。
+    dbWorkerClient.onExit(() => {
+      this.connected = false
+      this.monitorStarted = false
+    })
+  }
 
   async connect(): Promise<{ success: boolean; error?: string }> {
     try {
@@ -77,7 +87,9 @@ export class ChatService {
       if (!dbPath) return { success: false, error: '未找到微信数据，请确认已登录微信' }
       if (!decryptKey) return { success: false, error: '未能建立微信连接' }
 
-      const resourcesPath = typeof process['resourcesPath'] !== 'undefined' && process['resourcesPath']
+      // 资源根：打包版是 <安装>/resources；开发态 process.resourcesPath 指向
+      // node_modules/electron/dist/resources（不是项目 resources/），必须用 cwd。
+      const resourcesPath = app.isPackaged
         ? process.resourcesPath as string
         : join(process.cwd(), 'resources')
       await dbWorkerClient.setPaths(resourcesPath, this.configService.getCacheBasePath())
@@ -190,9 +202,18 @@ export class ChatService {
 
       const cacheEntry: AvatarCacheEntry = { avatarUrl, displayName, updatedAt: Date.now() }
       this.avatarCache.set(username, cacheEntry)
+      this.pruneAvatarCache()
       return { avatarUrl, displayName }
     } catch {
       return null
+    }
+  }
+
+  private pruneAvatarCache(): void {
+    if (this.avatarCache.size <= this.avatarCacheSoftLimit) return
+    const now = Date.now()
+    for (const [key, entry] of this.avatarCache) {
+      if (now - entry.updatedAt >= this.avatarCacheTtlMs) this.avatarCache.delete(key)
     }
   }
 

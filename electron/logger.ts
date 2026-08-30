@@ -24,6 +24,23 @@ function isLevelEnabled(level: LogLevel): boolean {
 // name -> 已确认可写的目录；不可写时值为 null（之后跳过写文件）
 const fileSinks = new Map<string, string | null>()
 
+// sink 轮转阈值：超过后改写为 <name>.old.log，防止长期运行时日志无限增长
+const SINK_ROTATE_BYTES = 5 * 1024 * 1024
+let sinkAppendCount = 0
+
+/** 每 512 次写入检查一次大小（避免逐行 stat），超限则把当前日志重命名为 .old.log */
+function rotateSinkIfNeeded(name: string, dir: string): void {
+  sinkAppendCount += 1
+  if (sinkAppendCount % 512 !== 0) return
+  try {
+    const file = require('path').join(dir, name + '.log')
+    if (require('fs').statSync(file).size <= SINK_ROTATE_BYTES) return
+    const oldFile = require('path').join(dir, name + '.old.log')
+    try { require('fs').rmSync(oldFile, { force: true }) } catch { /* 旧轮转文件不可删则由 rename 覆盖 */ }
+    require('fs').renameSync(file, oldFile)
+  } catch { /* 文件不存在等场景：跳过本轮轮转 */ }
+}
+
 /** 注册文件 sink；目录创建失败返回 false（调用方可换下一个候选目录）。 */
 export function configureFileSink(name: string, dir: string): boolean {
   if (fileSinks.has(name)) return fileSinks.get(name) !== null
@@ -41,6 +58,7 @@ function appendToSink(name: string, line: string): void {
   const dir = fileSinks.get(name)
   if (!dir) return
   try {
+    rotateSinkIfNeeded(name, dir)
     require('fs').appendFileSync(require('path').join(dir, name + '.log'), line + '\n', { encoding: 'utf8' })
   } catch {
     // 文件写入失败不应影响业务，标记 sink 不可用避免重复抛错

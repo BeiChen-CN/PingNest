@@ -1,4 +1,4 @@
-import { utilityProcess, type UtilityProcess } from 'electron'
+import type { UtilityProcess } from 'electron'
 import { join } from 'path'
 
 export interface DbWorkerResult<T = unknown> {
@@ -7,20 +7,55 @@ export interface DbWorkerResult<T = unknown> {
   [key: string]: unknown
 }
 
+/** dbWorker 需要用到的最小进程接口：electron UtilityProcess 与测试 fake 都满足该形状 */
+export type ForkableWorker = Pick<UtilityProcess, 'postMessage' | 'on' | 'kill' | 'stdout' | 'stderr'>
+
+export interface DbWorkerForkOptions {
+  serviceName: string
+  env: NodeJS.ProcessEnv
+}
+
+/**
+ * fork 工厂可注入：node:test 用 fake worker 直接加载本模块做协议契约测试，
+ * 生产路径走默认实现（运行期才解析 electron，避免模块顶层依赖 electron）。
+ */
+export type DbWorkerFork = (modulePath: string, options: DbWorkerForkOptions) => ForkableWorker
+
+function defaultFork(modulePath: string, options: DbWorkerForkOptions): ForkableWorker {
+  const { utilityProcess } = require('electron') as typeof import('electron')
+  return utilityProcess.fork(modulePath, [], options)
+}
+
 /**
  * DbWorkerClient：主进程侧封装，与 dbWorker（utilityProcess）通信。
  * 数据层（wcdb_api.dll）在独立进程运行，主进程通过消息调用。
  */
 export class DbWorkerClient {
-  private worker: UtilityProcess | null = null
-  private pending = new Map<number, { worker: UtilityProcess; resolve: (v: any) => void; reject: (e: Error) => void }>()
+  private worker: ForkableWorker | null = null
+  private pending = new Map<number, { worker: ForkableWorker; resolve: (v: any) => void; reject: (e: Error) => void }>()
   private msgId = 0
   private monitorListeners = new Set<(type: string, json: string) => void>()
+  private exitListeners = new Set<() => void>()
+  private readonly forkWorker: DbWorkerFork
 
-  private ensure(): UtilityProcess {
+  // 显式赋值而非参数属性：node:test 直接加载本文件时类型擦除不支持 parameter property
+  constructor(forkWorker: DbWorkerFork = defaultFork) {
+    this.forkWorker = forkWorker
+  }
+
+  /** 注册 worker 异常退出回调：上层持有的连接/监控标志随之失效，需要复位重建 */
+  onExit(listener: () => void): () => void {
+    this.exitListeners.add(listener)
+    return () => { this.exitListeners.delete(listener) }
+  }
+
+  private ensure(): ForkableWorker {
     if (this.worker) return this.worker
 
-    const worker = utilityProcess.fork(join(__dirname, 'dbWorker.js'), [], {
+    // __dirname 在打包 CJS 运行时可用；node:test 的 ESM 上下文没有它，
+    // fake 工厂不使用该路径，因此退化为占位名
+    const workerPath = typeof __dirname !== 'undefined' ? join(__dirname, 'dbWorker.js') : 'dbWorker.js'
+    const worker = this.forkWorker(workerPath, {
       serviceName: 'pingnest-db',
       env: { ...process.env }
     })
@@ -47,7 +82,7 @@ export class DbWorkerClient {
       }
     })
 
-    worker.on('exit', (code) => {
+    worker.on('exit', (code: number) => {
       console.error('[dbWorkerClient] dbWorker 退出 code=' + code)
       if (this.worker === worker) this.worker = null
       for (const [id, p] of this.pending) {
@@ -55,10 +90,15 @@ export class DbWorkerClient {
         this.pending.delete(id)
         p.reject(new Error('数据进程已退出 (code=' + code + ')'))
       }
+      for (const listener of this.exitListeners) {
+        try { listener() } catch (e) {
+          console.error('[dbWorkerClient] exit 监听器异常:', e)
+        }
+      }
     })
 
-    worker.stdout?.on('data', (d) => console.log('[dbWorker stdout]', String(d)))
-    worker.stderr?.on('data', (d) => console.error('[dbWorker stderr]', String(d)))
+    worker.stdout?.on('data', (d: any) => console.log('[dbWorker stdout]', String(d)))
+    worker.stderr?.on('data', (d: any) => console.error('[dbWorker stderr]', String(d)))
 
     return worker
   }
@@ -171,7 +211,7 @@ export class DbWorkerClient {
     this.dispose(worker)
   }
 
-  dispose(target: UtilityProcess | null = this.worker): void {
+  dispose(target: ForkableWorker | null = this.worker): void {
     if (!target) return
     if (this.worker === target) this.worker = null
     for (const [id, p] of this.pending) {

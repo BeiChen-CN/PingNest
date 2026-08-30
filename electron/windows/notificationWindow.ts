@@ -1,10 +1,13 @@
 import { BrowserWindow, ipcMain, screen } from 'electron'
 import { join } from 'path'
+import { applyWebHardening } from './webSecurity'
+import { IPC_CHANNELS } from '../../shared/ipcChannels'
 import {
   calculateNotificationOrigin,
   calculateNotificationMaxHeight,
   calculateNotificationWidth,
   normalizeNotificationPosition,
+  normalizeNotificationSize,
   normalizeNotificationStyle,
   type NotificationPosition,
   type NotificationWorkArea
@@ -66,10 +69,14 @@ function createNotificationWindow(): BrowserWindow | null {
     webPreferences: {
       preload: join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      sandbox: true
     }
   })
 
+  applyWebHardening(win)
+  // 关闭 DWM 系统阴影：透明通知窗口显示空内容时不会再出现方形框影
+  win.setHasShadow(false)
   win.setIgnoreMouseEvents(true, { forward: true })
 
   const loadUrl = isDev
@@ -87,23 +94,12 @@ function createNotificationWindow(): BrowserWindow | null {
   return win
 }
 
-export async function showNotification(data: any): Promise<void> {
-  let win = notificationWindow
-  if (!win || win.isDestroyed()) {
-    win = createNotificationWindow()
-  }
-  if (!win) return
+// 内容先行、显示在后：数据先推给渲染层，渲染层画好卡片回传尺寸（resize 通道）
+// 时窗口才真正显示——避免空窗口先弹出一个方框、内容一秒后才闪现的割裂感。
+let awaitingFirstPaint = false
+let fallbackTimer: ReturnType<typeof setTimeout> | null = null
 
-  if (win.webContents.isLoading()) {
-    win.once('ready-to-show', () => {
-      showAndSend(win as BrowserWindow, data)
-    })
-  } else {
-    showAndSend(win, data)
-  }
-}
-
-async function showAndSend(win: BrowserWindow, data: any): Promise<void> {
+function applyLayoutAndDeliver(win: BrowserWindow, data: any): void {
   lastNotificationData = data
   const position = normalizeNotificationPosition(data.position)
   const notificationStyle = normalizeNotificationStyle(data.notificationStyle)
@@ -112,45 +108,74 @@ async function showAndSend(win: BrowserWindow, data: any): Promise<void> {
   const cursorPoint = screen.getCursorScreenPoint()
   const targetDisplay = screen.getDisplayNearestPoint(cursorPoint) || screen.getPrimaryDisplay()
   const workArea = targetDisplay.workArea
-  const winWidth = calculateNotificationWidth(position, notificationStyle)
+  const stackSize = Math.max(1, Math.min(6, Math.floor(Number(data.queueSize) || 3)))
+  const cardSize = normalizeNotificationSize(data.cardSize)
+  const winWidth = calculateNotificationWidth(position, notificationStyle, stackSize, cardSize)
   const winHeight = 150
   const padding = 20
   lastNotificationLayout = { position, workArea: { ...workArea }, padding }
   const origin = calculateNotificationOrigin(position, winWidth, winHeight, workArea, padding)
 
   win.setBounds({ x: Math.floor(origin.x), y: Math.floor(origin.y), width: winWidth, height: winHeight })
+  win.webContents.send(IPC_CHANNELS.notification.show, { ...data, position })
+}
+
+function present(win: BrowserWindow): void {
   win.setIgnoreMouseEvents(false)
   win.showInactive()
   win.setAlwaysOnTop(true, 'screen-saver')
+}
 
-  win.webContents.send('notification:show', { ...data, position })
+export async function showNotification(data: any): Promise<void> {
+  let win = notificationWindow
+  if (!win || win.isDestroyed()) {
+    win = createNotificationWindow()
+  }
+  if (!win) return
+
+  applyLayoutAndDeliver(win, data)
+  awaitingFirstPaint = true
+  if (fallbackTimer) clearTimeout(fallbackTimer)
+  // 兜底：渲染层异常导致始终未回传尺寸时，1.8s 后强制显示（shadow 已关闭，
+  // 空窗口完全透明，不会出现方框），避免通知被吞。
+  fallbackTimer = setTimeout(() => {
+    fallbackTimer = null
+    if (awaitingFirstPaint && notificationWindow && !notificationWindow.isDestroyed()) {
+      awaitingFirstPaint = false
+      present(notificationWindow)
+    }
+  }, 1800)
 }
 
 export function registerNotificationHandlers(): void {
-  ipcMain.handle('notification:show', (_, data) => {
-    showNotification(data)
-  })
-
-  ipcMain.handle('notification:close', () => {
+  ipcMain.handle(IPC_CHANNELS.notification.close, () => {
     if (notificationWindow && !notificationWindow.isDestroyed()) {
       notificationWindow.hide()
       notificationWindow.setIgnoreMouseEvents(true, { forward: true })
     }
   })
 
-  ipcMain.on('notification:ready', (event) => {
+  ipcMain.on(IPC_CHANNELS.notification.ready, (event) => {
     if (lastNotificationData && notificationWindow && !notificationWindow.isDestroyed()) {
-      notificationWindow.webContents.send('notification:show', lastNotificationData)
+      // 渲染层（重）挂载完成：重发最新数据，等待其画好后经 resize 通道显示
+      awaitingFirstPaint = true
+      event.sender.send(IPC_CHANNELS.notification.show, { ...lastNotificationData, position: lastNotificationLayout?.position })
     }
   })
 
-  ipcMain.on('notification:resize', (event, { width, height }) => {
+  ipcMain.on(IPC_CHANNELS.notification.resize, (event, { width, height }) => {
     if (!notificationWindow || notificationWindow.isDestroyed()) return
     if (event.sender !== notificationWindow.webContents) return
-    const safeWidth = Math.max(320, Math.min(500, Math.round(Number(width) || 400)))
+    const safeWidth = Math.max(80, Math.min(920, Math.round(Number(width) || 400)))
     const requestedHeight = Math.round(Number(height) || 150)
     const style = normalizeNotificationStyle(lastNotificationData?.notificationStyle)
-    const safeHeight = Math.max(80, Math.min(calculateNotificationMaxHeight(style), requestedHeight))
+    // 堆叠队列：上限 = 单卡上限 × 同屏卡片数，同时不超过所在工作区高度
+    const stackSize = Math.max(1, Math.min(6, Math.floor(Number(lastNotificationData?.queueSize) || 3)))
+    const stackMax = calculateNotificationMaxHeight(style, stackSize, normalizeNotificationSize(lastNotificationData?.cardSize))
+    const workAreaCap = lastNotificationLayout
+      ? Math.max(160, lastNotificationLayout.workArea.height - lastNotificationLayout.padding * 2)
+      : stackMax
+    const safeHeight = Math.max(80, Math.min(stackMax + 12, workAreaCap, requestedHeight))
     const layout = lastNotificationLayout
     if (!layout) {
       notificationWindow.setSize(safeWidth, safeHeight)
@@ -158,15 +183,21 @@ export function registerNotificationHandlers(): void {
     }
     const origin = calculateNotificationOrigin(layout.position, safeWidth, safeHeight, layout.workArea, layout.padding)
     notificationWindow.setBounds({ x: Math.floor(origin.x), y: Math.floor(origin.y), width: safeWidth, height: safeHeight })
+    // 渲染层已画好卡片并回传尺寸 → 此刻才是显示窗口的正确时机（内容先行）
+    if (awaitingFirstPaint && !notificationWindow.webContents.isLoading()) {
+      awaitingFirstPaint = false
+      if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null }
+      notificationWindow.setIgnoreMouseEvents(false)
+      notificationWindow.showInactive()
+      notificationWindow.setAlwaysOnTop(true, 'screen-saver')
+    }
   })
 
-  ipcMain.on('notification-clicked', (_event, sessionId) => {
+  // 点击导航后窗口可见性由渲染层自管理：堆叠队列里其余卡片继续展示，
+  // 全部卡片退场后渲染层主动调用 notification:close 隐藏窗口。
+  ipcMain.on(IPC_CHANNELS.notification.clicked, (_event, sessionId) => {
     if (onNotificationNavigate) {
       onNotificationNavigate(String(sessionId || ''))
-    }
-    if (notificationWindow && !notificationWindow.isDestroyed()) {
-      notificationWindow.hide()
-      notificationWindow.setIgnoreMouseEvents(true, { forward: true })
     }
   })
 }

@@ -1,5 +1,6 @@
-import { ConfigService, type NotifyRule, type NotificationPosition } from '../services/config'
+import type { ConfigService } from '../services/config'
 import type { MessagePushPayload } from '../services/messagePushService'
+import type { NotificationPosition, NotifyRule } from '../../shared/appConfig'
 
 export interface RuleEffect {
   accentColor?: string
@@ -11,9 +12,15 @@ export interface RuleEffect {
 
 /**
  * 规则引擎：根据会话/关键词匹配规则，输出弹窗覆盖效果。
+ * 纯逻辑模块（仅类型导入，零 electron 依赖），生产单例在 main.ts 组装。
  */
 export class RuleEngine {
-  constructor(private configService: ConfigService) { }
+  private readonly configService: Pick<ConfigService, 'get'>
+
+  // 显式赋值而非参数属性：node:test 直接加载本文件时类型擦除不支持 parameter property
+  constructor(configService: Pick<ConfigService, 'get'>) {
+    this.configService = configService
+  }
 
   match(payload: MessagePushPayload): RuleEffect {
     const rules = this.configService.get('notifyRules')
@@ -55,5 +62,3 @@ export class RuleEngine {
     return {}
   }
 }
-
-export const ruleEngine = new RuleEngine(ConfigService.getInstance())

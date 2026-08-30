@@ -1,17 +1,11 @@
 /**
- * Win32 API 的 koffi 绑定（kernel32 / user32）。
- * 独立成模块：进程查找、窗口枚举与 wx_key.dll 注入都需要原生调用，
- * 但职责不同——这里只负责"声明并持有函数指针"。
+ * Win32 API 的 koffi 绑定（user32）。
+ * 独立成模块：进程查找、窗口枚举与激活都需要原生调用，
+ * 这里只负责"声明并持有函数指针"。
  */
 export class Win32Api {
   private koffi: any = null
-  private kernel32: any = null
   private user32: any = null
-
-  // kernel32
-  OpenProcess: any = null
-  CloseHandle: any = null
-  QueryFullProcessImageNameW: any = null
 
   // user32
   EnumWindows: any = null
@@ -29,21 +23,6 @@ export class Win32Api {
   ensureKoffi(): any {
     if (!this.koffi) this.koffi = require('koffi')
     return this.koffi
-  }
-
-  ensureKernel32(): boolean {
-    if (this.kernel32) return true
-    try {
-      const koffi = this.ensureKoffi()
-      this.kernel32 = koffi.load('kernel32.dll')
-      this.OpenProcess = this.kernel32.func('OpenProcess', 'void*', ['uint32', 'bool', 'uint32'])
-      this.CloseHandle = this.kernel32.func('CloseHandle', 'bool', ['void*'])
-      this.QueryFullProcessImageNameW = this.kernel32.func('QueryFullProcessImageNameW', 'bool', ['void*', 'uint32', koffi.out('uint16*'), koffi.out('uint32*')])
-      return true
-    } catch (e) {
-      console.error('[KeyService] kernel32 初始化失败:', e)
-      return false
-    }
   }
 
   ensureUser32(): boolean {

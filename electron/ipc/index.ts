@@ -6,9 +6,10 @@ import { dbWorkerClient } from '../services/dbWorkerClient'
 import { messagePushService } from '../services/messagePushService'
 import { notifyCenterStore } from '../services/notifyCenterStore'
 import { connectAndStart, hasSavedHook, hookAndConnect, reconnectAndStart, removeSavedHook } from '../connection'
-import { broadcastNotifyCenter } from '../notifyBroadcast'
+import { broadcastNotifyCenterPatch } from '../notifyBroadcast'
 import { cleanupExpiredHistory } from '../maintenance'
 import { validateConfigValue } from './configValidation'
+import { IPC_CHANNELS } from '../../shared/ipcChannels'
 
 interface IpcDeps {
   getMainWindow: () => BrowserWindow | null
@@ -25,42 +26,60 @@ export function registerIpcHandlers(deps: IpcDeps): void {
   registerWindowHandlers(deps)
 }
 
+// 微信 PID 查询走 tasklist 子进程，开销不低；状态接口被渲染层高频轮询，
+// 这里做 10 秒 TTL 缓存（通知点击激活窗口走 keyService 的独立路径，不受影响）。
+let wechatPidCache: { pid: number | null; checkedAt: number } | null = null
+const WECHAT_PID_CACHE_TTL_MS = 10_000
+
+async function findWeChatPidCached(): Promise<number | null> {
+  const now = Date.now()
+  if (wechatPidCache && now - wechatPidCache.checkedAt < WECHAT_PID_CACHE_TTL_MS) {
+    return wechatPidCache.pid
+  }
+  const pid = await keyService.findWeChatPid(0)
+  wechatPidCache = { pid, checkedAt: now }
+  return pid
+}
+
 function registerAppHandlers(): void {
-  ipcMain.handle('app:getStatus', async () => {
+  ipcMain.handle(IPC_CHANNELS.app.getStatus, async () => {
     const cfg = configService.getAll()
-    const wechatPid = await keyService.findWeChatPid(0)
+    const wechatPid = await findWeChatPidCached()
     const workerReady = await Promise.race([
       dbWorkerClient.isReady().catch(() => ({ ready: false })),
       new Promise<{ ready: boolean }>((resolve) => setTimeout(() => resolve({ ready: false }), 1500))
     ])
+    const hookReady = hasSavedHook(cfg)
     return {
       connected: chatService.isConnected(),
       wcdbReady: workerReady.ready === true,
       wechatRunning: wechatPid !== null,
-      hasFullConfig: !!(cfg.dbPath && cfg.decryptKey && cfg.myWxid),
-      hookReady: hasSavedHook(cfg),
+      hasFullConfig: hookReady,
+      hookReady,
+      pushError: messagePushService.getDegradedReason(),
+      history: notifyCenterStore.getPersistenceStatus(),
       config: getPublicConfig(cfg)
     }
   })
 
-  ipcMain.handle('app:connect', async () => {
+  ipcMain.handle(IPC_CHANNELS.app.connect, async () => {
     return connectAndStart()
   })
 
-  ipcMain.handle('app:reconnect', async () => {
+  ipcMain.handle(IPC_CHANNELS.app.reconnect, async () => {
     return reconnectAndStart()
   })
 
-  ipcMain.handle('app:hook', async (event) => {
-    return hookAndConnect((progress) => event.sender.send('app:hookProgress', progress))
+  ipcMain.handle(IPC_CHANNELS.app.hook, async (event) => {
+    return hookAndConnect((progress) => event.sender.send(IPC_CHANNELS.app.hookProgress, progress))
   })
 
-  ipcMain.handle('app:removeHook', async () => {
+  ipcMain.handle(IPC_CHANNELS.app.removeHook, async () => {
     await removeSavedHook()
     return { success: true }
   })
 
-  ipcMain.handle('app:disconnect', async () => {
+  ipcMain.handle(IPC_CHANNELS.app.disconnect, async () => {
     messagePushService.stop()
     await chatService.close()
     return { success: true }
@@ -68,11 +87,11 @@ function registerAppHandlers(): void {
 }
 
 function registerConfigHandlers(): void {
-  ipcMain.handle('config:get', async () => {
+  ipcMain.handle(IPC_CHANNELS.config.get, async () => {
     return getPublicConfig(configService.getAll())
   })
 
-  ipcMain.handle('config:set', async (_event, key: keyof ConfigSchema, value: unknown) => {
+  ipcMain.handle(IPC_CHANNELS.config.set, async (_event, key: keyof ConfigSchema, value: unknown) => {
     try {
       const validationError = validateConfigValue(key, value)
       if (validationError) return { success: false, error: validationError }
@@ -95,7 +114,8 @@ function registerConfigHandlers(): void {
         messagePushService.handleReconnectOptionsChanged()
       }
       if (key === 'autoCleanupHistory' || key === 'historyRetentionDays') {
-        if (cleanupExpiredHistory() > 0) broadcastNotifyCenter()
+        const removed = cleanupExpiredHistory()
+        if (removed.length > 0) broadcastNotifyCenterPatch({ removedIds: removed.map((entry) => entry.id) })
       }
       return { success: true }
     } catch (e) {
@@ -105,41 +125,41 @@ function registerConfigHandlers(): void {
 }
 
 function registerNotifyHandlers(): void {
-  ipcMain.handle('notify:list', async () => {
+  ipcMain.handle(IPC_CHANNELS.notifyCenter.list, async () => {
     return notifyCenterStore.getEntries()
   })
 
-  ipcMain.handle('notify:markRead', async (_event, id: string) => {
-    notifyCenterStore.markRead(String(id || ''))
-    broadcastNotifyCenter()
+  ipcMain.handle(IPC_CHANNELS.notifyCenter.markRead, async (_event, id: string) => {
+    const updated = notifyCenterStore.markRead(String(id || ''))
+    if (updated) broadcastNotifyCenterPatch({ updated: [updated] })
     return { success: true }
   })
 
-  ipcMain.handle('notify:markSessionRead', async (_event, sessionId: string) => {
-    notifyCenterStore.markSessionRead(String(sessionId || ''))
-    broadcastNotifyCenter()
+  ipcMain.handle(IPC_CHANNELS.notifyCenter.markSessionRead, async (_event, sessionId: string) => {
+    const updated = notifyCenterStore.markSessionRead(String(sessionId || ''))
+    if (updated.length > 0) broadcastNotifyCenterPatch({ updated })
     return { success: true }
   })
 
-  ipcMain.handle('notify:remove', async (_event, id: string) => {
-    notifyCenterStore.remove(String(id || ''))
-    broadcastNotifyCenter()
+  ipcMain.handle(IPC_CHANNELS.notifyCenter.remove, async (_event, id: string) => {
+    const removedId = notifyCenterStore.remove(String(id || ''))
+    if (removedId) broadcastNotifyCenterPatch({ removedIds: [removedId] })
     return { success: true }
   })
 
-  ipcMain.handle('notify:clear', async () => {
+  ipcMain.handle(IPC_CHANNELS.notifyCenter.clear, async () => {
     notifyCenterStore.clear()
-    broadcastNotifyCenter()
+    broadcastNotifyCenterPatch({ clear: true })
     return { success: true }
   })
 }
 
 function registerWindowHandlers(deps: IpcDeps): void {
-  ipcMain.on('window:minimize', () => deps.getMainWindow()?.minimize())
-  ipcMain.on('window:toggleMaximize', () => {
+  ipcMain.on(IPC_CHANNELS.window.minimize, () => deps.getMainWindow()?.minimize())
+  ipcMain.on(IPC_CHANNELS.window.toggleMaximize, () => {
     const win = deps.getMainWindow()
     if (!win) return
     win.isMaximized() ? win.unmaximize() : win.maximize()
   })
-  ipcMain.on('window:close', () => deps.getMainWindow()?.close())
+  ipcMain.on(IPC_CHANNELS.window.close, () => deps.getMainWindow()?.close())
 }

@@ -5,8 +5,12 @@
  */
 
 export type NotificationPosition = 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' | 'top-center'
-/** island：灵动胶囊（居中展开/收起） */
-export type NotificationStyle = 'standard' | 'compact' | 'layered' | 'minimal' | 'island'
+/** 2026 重设计九套样式：潮汐/终端/信笺/霓虹弧光/音轨/蜂巢/卷轴/呼吸圆环/灵动胶囊 */
+export type NotificationStyle = 'tidal' | 'terminal' | 'mail' | 'neon' | 'wave' | 'hex' | 'scroll' | 'halo' | 'capsule'
+/** 通知卡片整体大小（CSS zoom 缩放，对所有样式生效） */
+export type NotificationCardSize = 'large' | 'medium' | 'small'
+/** 全局动效方案：绸缎/水滴/墨锋/漂浮 */
+export type MotionScheme = 'satin' | 'droplet' | 'ink' | 'drift'
 export type NotificationFilterMode = 'all' | 'whitelist' | 'blacklist'
 export type NotificationClickBehavior = 'open-app' | 'open-wechat' | 'none'
 
@@ -52,6 +56,12 @@ export interface AppConfig {
   notificationOpacity: number
   showNotificationSummary: boolean
   notificationClickBehavior: NotificationClickBehavior
+  /** 同屏最多堆叠的通知卡片数（1 = 旧的单卡替换行为） */
+  notificationQueueSize: number
+  /** 通知卡片整体大小：large 1.15× / medium 1× / small 0.85× */
+  notificationSize: NotificationCardSize
+  /** 全局动效方案：绸缎/水滴/墨锋/漂浮 */
+  motionScheme: MotionScheme
 
   // 规则
   notifyRules: NotifyRule[]
@@ -65,6 +75,8 @@ export interface AppConfig {
   trayNotifications: boolean
   autoReconnect: boolean
   reconnectIntervalSeconds: number
+  /** 本地轮询基础间隔（秒）；原生监控管道活跃时自动降频到 max(5×, 10 秒) */
+  pollIntervalSeconds: number
   historyRetentionDays: number
   autoCleanupHistory: boolean
 }
@@ -78,7 +90,7 @@ export const DEFAULT_CONFIG: AppConfig = {
 
   notificationEnabled: true,
   notificationPosition: 'top-right',
-  notificationStyle: 'standard',
+  notificationStyle: 'capsule',
   notificationFilterMode: 'all',
   notificationFilterList: [],
   mergeWindowMs: 3500,
@@ -87,6 +99,9 @@ export const DEFAULT_CONFIG: AppConfig = {
   notificationOpacity: 90,
   showNotificationSummary: true,
   notificationClickBehavior: 'open-app',
+  notificationQueueSize: 3,
+  notificationSize: 'medium',
+  motionScheme: 'satin',
 
   notifyRules: [],
 
@@ -97,6 +112,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   trayNotifications: true,
   autoReconnect: true,
   reconnectIntervalSeconds: 3,
+  pollIntervalSeconds: 2,
   historyRetentionDays: 30,
   autoCleanupHistory: true
 }

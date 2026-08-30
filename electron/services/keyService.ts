@@ -1,9 +1,14 @@
 import { join } from 'path'
-import { existsSync, copyFileSync, mkdirSync } from 'fs'
+import { existsSync, copyFileSync, mkdirSync, rmSync } from 'fs'
 import os from 'os'
 import { WeChatProcessFinder } from './key/processFinder'
+import { formatIntegrityError, verifyResourceFile } from './dllIntegrity'
 
 export type DbKeyResult = { success: boolean; key?: string; error?: string; logs?: string[] }
+
+const WX_KEY_MANIFEST_ENTRY = 'key/win32/x64/wx_key.dll'
+
+type KeyLoadFailure = { kind: 'missing' | 'integrity' | 'load'; detail: string }
 
 /**
  * KeyService（移植自 WeFlow，仅保留 Windows 获取数据库密钥能力）
@@ -18,6 +23,7 @@ export class KeyService {
   private koffi: any = null
   private lib: any = null
   private initialized = false
+  private lastLoadFailure: KeyLoadFailure | null = null
   private initHook: any = null
   private pollKeyData: any = null
   private getStatusMessage: any = null
@@ -49,12 +55,27 @@ export class KeyService {
     return candidates[0] || 'wx_key.dll'
   }
 
-  private localizeNetworkDll(originalPath: string): string {
+  private getManifestPath(): string {
+    if (process.env.WX_DLL_MANIFEST_PATH) return process.env.WX_DLL_MANIFEST_PATH
+    if (process.env.APP_IS_PACKAGED === 'true') {
+      return join(process.resourcesPath, 'resources', 'dll-manifest.json')
+    }
+    return join(process.cwd(), 'resources', 'dll-manifest.json')
+  }
+
+  /**
+   * UNC 路径场景把 DLL 复制到本地临时目录再加载。缓存副本同样过完整性校验，
+   * 校验失败（可能被篡改或源文件已更新）时删除并从源重建。
+   */
+  private localizeNetworkDll(manifestPath: string, originalPath: string): string {
     try {
       const tempDir = join(os.tmpdir(), 'pingnest_dll_cache')
       if (!existsSync(tempDir)) mkdirSync(tempDir, { recursive: true })
       const localPath = join(tempDir, 'wx_key.dll')
-      if (existsSync(localPath)) return localPath
+      if (existsSync(localPath)) {
+        if (verifyResourceFile(manifestPath, WX_KEY_MANIFEST_ENTRY, localPath).ok) return localPath
+        try { rmSync(localPath, { force: true }) } catch { /* 尽力清理：删除失败时 copyFileSync 会覆盖 */ }
+      }
       copyFileSync(originalPath, localPath)
       return localPath
     } catch {
@@ -64,15 +85,26 @@ export class KeyService {
 
   private ensureLoaded(): boolean {
     if (this.initialized) return true
+    this.lastLoadFailure = null
     let dllPath = ''
     try {
       this.koffi = require('koffi')
       dllPath = this.getDllPath()
       if (!existsSync(dllPath)) {
+        this.lastLoadFailure = { kind: 'missing', detail: '文件不存在: ' + dllPath }
         console.error('[KeyService] wx_key.dll 不存在: ' + dllPath)
         return false
       }
-      if (dllPath.startsWith('\\')) dllPath = this.localizeNetworkDll(dllPath)
+      const manifestPath = this.getManifestPath()
+      if (dllPath.startsWith('\\')) dllPath = this.localizeNetworkDll(manifestPath, dllPath)
+
+      // 加载前校验 SHA256 清单：被替换/损坏的注入 DLL 一律拒载
+      const verification = verifyResourceFile(manifestPath, WX_KEY_MANIFEST_ENTRY, dllPath)
+      if (!verification.ok) {
+        this.lastLoadFailure = { kind: 'integrity', detail: formatIntegrityError(verification.detail || '未知原因') }
+        console.error('[KeyService] wx_key.dll 完整性校验失败: ' + (verification.detail || ''))
+        return false
+      }
 
       this.lib = this.koffi.load(dllPath)
       this.initHook = this.lib.func('bool InitializeHook(uint32 targetPid)')
@@ -83,6 +115,7 @@ export class KeyService {
       this.initialized = true
       return true
     } catch (e) {
+      this.lastLoadFailure = { kind: 'load', detail: '加载 ' + (dllPath || 'wx_key.dll') + ' 失败: ' + String(e) }
       console.error('[KeyService] 加载 wx_key.dll 失败 ' + dllPath + ': ' + String(e))
       return false
     }
@@ -120,7 +153,16 @@ export class KeyService {
     onStatus?: (message: string, level: number) => void
   ): Promise<DbKeyResult> {
     if (process.platform !== 'win32') return { success: false, error: '仅支持 Windows' }
-    if (!this.ensureLoaded()) return { success: false, error: 'wx_key.dll 未加载' }
+    if (!this.ensureLoaded()) {
+      const failure = this.lastLoadFailure
+      if (failure?.kind === 'integrity') {
+        return { success: false, error: failure.detail }
+      }
+      return {
+        success: false,
+        error: 'wx_key.dll 加载失败（' + (failure?.detail || '原因未知') + '）。\n\n请检查：\n1. resources/key/win32/x64/wx_key.dll 是否存在且未被替换\n2. 杀毒软件是否已隔离该文件（请恢复并加入信任）\n3. 必要时重新安装 PingNest'
+      }
+    }
 
     const logs: string[] = []
 

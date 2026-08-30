@@ -1,10 +1,10 @@
 import { app } from 'electron'
 import { configService } from './services/config'
-import { notifyCenterStore } from './services/notifyCenterStore'
+import { notifyCenterStore, type NotifyCenterEntry } from './services/notifyCenterStore'
 
-/** 按保留期清理过期通知历史，返回清理条数。 */
-export function cleanupExpiredHistory(): number {
-  if (!configService.get('autoCleanupHistory')) return 0
+/** 按保留期清理过期通知历史，返回被清理的条目（供调用方构造增量广播）。 */
+export function cleanupExpiredHistory(): NotifyCenterEntry[] {
+  if (!configService.get('autoCleanupHistory')) return []
   return notifyCenterStore.cleanupOlderThan(configService.get('historyRetentionDays'))
 }
 

@@ -6,9 +6,10 @@ import { resolveSqlMessageSendState } from './messageDirection'
 import { mapSqlMessageContent } from './sqlMessageContent'
 import { cleanAccountDirName, expandHomePath } from './dbPathService'
 import { WcdbFfiBindings } from './wcdb/ffiBindings'
+import { buildMonitorPipeName, isMonitorStartAccepted } from './wcdb/monitorCompanion'
 import { findMessageDbPaths, findSessionDb, resolveDbStoragePath } from './wcdb/paths'
 import { normalizeMessages, normalizeSessions, parseMessageJson } from './wcdb/normalizer'
-import { buildMessageTableExistsSql, buildMessagesByTableSql, buildName2IdRowIdSql, buildName2IdUsernameSql, messageTableName } from './wcdb/sqlBuilder'
+import { buildMessageTableExistsSql, buildMessagesByTableSql, buildName2IdRowIdSql, buildName2IdUsernamesSql, messageTableName } from './wcdb/sqlBuilder'
 
 // 数据服务初始化错误信息
 let lastDllInitError: string | null = null
@@ -90,36 +91,63 @@ export class WcdbCore {
 
   /** 命名管道监控：微信数据库变化时回调 (type, json) */
   startMonitor(callback: (type: string, json: string) => void): boolean {
-    if (!this.ffi.startMonitorPipeFn) {
-      // EchoTrace/legacy builds do not expose the optional named-pipe API.
-      // The message service will use its regular polling loop instead.
-      this.monitorCallback = callback
-      this.writeLog('[monitor] native pipe unavailable; polling fallback enabled', true)
-      return true
-    }
-    this.monitorCallback = callback
-    try {
-      const result = this.ffi.startMonitorPipeFn()
-      this.writeLog('[monitor] wcdbStartMonitorPipe rc=' + result, true)
-      if (result !== 0) return false
+    if (this.ffi.startMonitorPipeFn) {
+      try {
+        const result = this.ffi.startMonitorPipeFn()
+        this.writeLog('[monitor] wcdbStartMonitorPipe rc=' + result, true)
+        if (result !== 0) return false
 
-      let pipePath = '\\\\.\\pipe\\weflow_monitor'
-      if (this.ffi.getMonitorPipeNameFn) {
-        try {
-          const namePtr = [null as any]
-          if (this.ffi.getMonitorPipeNameFn(namePtr) === 0 && namePtr[0]) {
-            pipePath = this.ffi.decodeCString(namePtr[0])
-            this.ffi.freeString(namePtr[0])
-          }
-        } catch { /* 取不到管道名时使用默认管道名 */ }
+        let pipePath = '\\\\.\\pipe\\weflow_monitor'
+        if (this.ffi.getMonitorPipeNameFn) {
+          try {
+            const namePtr = [null as any]
+            if (this.ffi.getMonitorPipeNameFn(namePtr) === 0 && namePtr[0]) {
+              pipePath = this.ffi.decodeCString(namePtr[0])
+              this.ffi.freeString(namePtr[0])
+            }
+          } catch { /* 取不到管道名时使用默认管道名 */ }
+        }
+        this.writeLog('[monitor] 管道: ' + pipePath, true)
+        this.connectMonitorPipe(pipePath)
+        return true
+      } catch (e) {
+        this.writeLog('[monitor] startMonitor exception: ' + String(e), true)
+        return false
       }
-      this.writeLog('[monitor] 管道: ' + pipePath, true)
-      this.connectMonitorPipe(pipePath)
-      return true
-    } catch (e) {
-      this.writeLog('[monitor] startMonitor exception: ' + String(e), true)
-      return false
     }
+    if (this.ffi.companionStartFn) return this.startCompanionMonitor(callback)
+    // EchoTrace/legacy builds do not expose the optional named-pipe API.
+    // The message service will use its regular polling loop instead.
+    this.monitorCallback = callback
+    this.writeLog('[monitor] native pipe unavailable; polling fallback enabled', true)
+    return true
+  }
+
+  /**
+   * 伴生监控库通道：pingnest_monitor.dll 监听 db_storage 目录（currentDbStoragePath，
+   * open() 成功后已就绪），变更经命名管道推送，复用 connectMonitorPipe 的行解析消费端。
+   * 管道名由 suffix（worker 进程号）决定，与 C++ 侧规则一致。任何失败都保留轮询通道
+   * （返回 true，不阻断连接）。
+   */
+  private startCompanionMonitor(callback: (type: string, json: string) => void): boolean {
+    this.monitorCallback = callback
+    const watchDir = this.currentDbStoragePath
+    const suffix = String(process.pid)
+    if (!watchDir || !existsSync(watchDir)) {
+      this.writeLog('[monitor] 伴生监控缺少监听目录，保留轮询通道', true)
+      return true
+    }
+    try {
+      const rc = Number(this.ffi.companionStartFn(watchDir, suffix))
+      this.writeLog('[monitor] pingnest_monitor_start rc=' + rc + ' dir=' + watchDir, true)
+      if (!isMonitorStartAccepted(rc)) return true
+      const pipePath = buildMonitorPipeName(suffix)
+      this.writeLog('[monitor] 伴生管道: ' + pipePath, true)
+      this.connectMonitorPipe(pipePath)
+    } catch (e) {
+      this.writeLog('[monitor] 伴生监控启动异常，保留轮询通道: ' + String(e), true)
+    }
+    return true
   }
 
   setMonitorOptions(autoReconnect: boolean, intervalSeconds: number): void {
@@ -206,6 +234,9 @@ export class WcdbCore {
     }
     if (this.ffi.stopMonitorPipeFn) {
       try { this.ffi.stopMonitorPipeFn() } catch { /* 停止监控失败可忽略（进程退出路径） */ }
+    }
+    if (this.ffi.companionStopFn) {
+      try { this.ffi.companionStopFn() } catch { /* 停止监控失败可忽略（进程退出路径） */ }
     }
   }
 
@@ -411,6 +442,7 @@ export class WcdbCore {
     const dbPaths = findMessageDbPaths(dbStorage)
     if (dbPaths.length === 0) return []
 
+    const isGroup = String(sessionId || '').endsWith('@chatroom')
     const results: any[] = []
 
     for (const dbPath of dbPaths) {
@@ -423,8 +455,19 @@ export class WcdbCore {
 
       const myRowId = await this.getMyRowId(dbPath)
       const tableName = messageTableName(sessionId)
+
+      // 群消息发送者按批反查（单条 IN 查询），避免逐行 execQuery 的 N+1 开销
+      const senderIds = new Set<number>()
+      if (isGroup) {
+        for (const row of rowsRes.rows) {
+          const realSenderId = Number(row.real_sender_id ?? row.realSenderId ?? 0)
+          if (realSenderId > 0) senderIds.add(realSenderId)
+        }
+      }
+      const senderUsernames = await this.resolveSenderUsernames(dbPath, Array.from(senderIds))
+
       for (const row of rowsRes.rows) {
-        results.push(await this.mapSqlMessage(row, dbPath, tableName, myRowId, sessionId))
+        results.push(await this.mapSqlMessage(row, dbPath, tableName, myRowId, sessionId, senderUsernames))
       }
     }
 
@@ -456,27 +499,38 @@ export class WcdbCore {
     return null
   }
 
-  /** Name2Id 反查：rowid → user_name（群消息发送者） */
-  private async resolveSenderUsername(dbPath: string, realSenderId: number): Promise<string> {
-    const res = await this.execQuery('message', dbPath, buildName2IdUsernameSql(realSenderId))
-    if (res.success && Array.isArray(res.rows) && res.rows.length > 0) {
-      return String(res.rows[0]?.user_name || '')
+  /**
+   * Name2Id 批量反查：rowid 集合 → user_name（群消息发送者）。
+   * 分块执行避免超长 IN 列表；失败或空集返回空 Map，映射缺失的行由调用方按无发送者处理。
+   */
+  private async resolveSenderUsernames(dbPath: string, realSenderIds: number[]): Promise<Map<number, string>> {
+    const result = new Map<number, string>()
+    const uniqueIds = Array.from(new Set(
+      realSenderIds.map((id) => Math.floor(Number(id) || 0)).filter((id) => id > 0)
+    ))
+    const CHUNK_SIZE = 500
+    for (let i = 0; i < uniqueIds.length; i += CHUNK_SIZE) {
+      const chunk = uniqueIds.slice(i, i + CHUNK_SIZE)
+      const res = await this.execQuery('message', dbPath, buildName2IdUsernamesSql(chunk))
+      if (!res.success || !Array.isArray(res.rows)) continue
+      for (const row of res.rows) {
+        const rowId = Number(row.rowid ?? row.RowId ?? 0)
+        const username = String(row.user_name ?? row.username ?? '')
+        if (rowId > 0 && username) result.set(rowId, username)
+      }
     }
-    return ''
+    return result
   }
 
   /** SQL 行 → Message 结构 */
-  private async mapSqlMessage(row: Record<string, any>, dbPath: string, tableName: string, myRowId: number | null, sessionId: string): Promise<any> {
+  private async mapSqlMessage(row: Record<string, any>, dbPath: string, tableName: string, myRowId: number | null, sessionId: string, senderUsernames: Map<number, string>): Promise<any> {
     const localType = Number(row.local_type ?? row.localType ?? 0)
     const rawContent = String(row.message_content ?? row.msg_content ?? '')
     const isGroup = String(sessionId || '').endsWith('@chatroom')
-    const realSenderId = Number(row.real_sender_id ?? 0)
+    const realSenderId = Number(row.real_sender_id ?? row.realSenderId ?? 0)
     const isSend = resolveSqlMessageSendState(myRowId, realSenderId)
 
-    let senderUsername = ''
-    if (isGroup && realSenderId > 0) {
-      senderUsername = await this.resolveSenderUsername(dbPath, realSenderId)
-    }
+    const senderUsername = isGroup && realSenderId > 0 ? (senderUsernames.get(realSenderId) || '') : ''
 
     const contentFields = mapSqlMessageContent(localType, rawContent)
     const result: Record<string, unknown> = {
@@ -594,14 +648,22 @@ export class WcdbCore {
           this.avatarUrlCache.set(username, { url, updatedAt: now })
         }
       }
+      this.pruneAvatarUrlCache(now)
       return { success: true, map: resultMap }
     } catch (e) {
       return { success: false, error: String(e) }
     }
   }
 
-  async getContact(username: string): Promise<{ success: boolean; contact?: any; error?: string }> {
-    if (!this.ensureReady()) return { success: false, error: 'WCDB 未连接' }
+  /** 头像 URL 缓存条目软上限：超过后清理过期项，防止长期驻留时 Map 只增不减 */
+  private pruneAvatarUrlCache(now: number): void {
+    if (this.avatarUrlCache.size <= 500) return
+    for (const [key, entry] of this.avatarUrlCache) {
+      if (now - entry.updatedAt >= this.avatarCacheTtlMs) this.avatarUrlCache.delete(key)
+    }
+  }
+
+  async getContact(username: string): Promise<{ success: boolean; contact?: any; error?: string }> {    if (!this.ensureReady()) return { success: false, error: 'WCDB 未连接' }
     if (!this.ffi.getContactFn) return { success: false, error: '当前 WCDB 构建不提供联系人接口' }
     try {
       const outPtr = [null as any]

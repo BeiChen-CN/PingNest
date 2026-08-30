@@ -5,6 +5,7 @@ import {
   buildMessageTableExistsSql,
   buildMessagesByTableSql,
   buildName2IdRowIdSql,
+  buildName2IdUsernamesSql,
   messageTableName,
   validateReadOnlySql
 } from '../electron/services/wcdb/sqlBuilder.ts'
@@ -33,6 +34,16 @@ test('buildMessagesByTableSql：since 非负、limit 收敛到 [1,5000]', () => 
 test('buildName2IdRowIdSql：转义单引号防注入', () => {
   const sql = buildName2IdRowIdSql("wxid_o'clock")
   assert.match(sql, /'wxid_o''clock'/)
+})
+
+test('buildName2IdUsernamesSql：去重、收敛为正整数、空集返回空串', () => {
+  assert.equal(buildName2IdUsernamesSql([]), '')
+  assert.equal(buildName2IdUsernamesSql([0, -3, Number.NaN]), '')
+  assert.equal(buildName2IdUsernamesSql([5, 5, 2.9, -1]), 'SELECT rowid, user_name FROM Name2Id WHERE rowid IN (5,2)')
+  const sql = buildName2IdUsernamesSql([7])
+  assert.match(sql, /^SELECT rowid, user_name FROM Name2Id WHERE rowid IN \(7\)$/)
+  // 批量语句同样必须通过只读白名单
+  assert.equal(validateReadOnlySql(sql), null)
 })
 
 test('validateReadOnlySql：允许 SELECT 与只读 PRAGMA', () => {
