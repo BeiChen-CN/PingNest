@@ -1,6 +1,6 @@
 {
   "algorithm": "sha256",
-  "generatedAt": "2026-08-30T11:44:57.144Z",
+  "generatedAt": "2026-08-30T11:57:07.343Z",
   "files": {
     "key/win32/x64/wx_key.dll": "f946ef8cb2a59bc03ce0b6ae0e22ed905a57e4c8228ed6b1c2b07fd54ecb9a05",
     "wcdb/win32/x64/wcdb_api.dll": "47051ea23238845ee5df1326682f0f17fbd16f18a7f47585dabd360568c7b222",
