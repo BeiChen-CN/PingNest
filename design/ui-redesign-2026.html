@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PingNest · UI 推倒重来 v2 · 4 套结构性方案</title>
+<style>
+/* ============================================================
+   PingNest UI 推倒重来 v2 —— 四种不同的信息架构骨架
+   共同点只有：淡奶油绿主色 + 通知中心场景。其余全部推倒。
+   切换：顶部 4 个标签，每套是完全不同的骨架，不是换肤。
+   ============================================================ */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --cream: #EFEAD8; --cream-2: #E6E0C8; --paper: #F7F4E9;
+  --ink: #2A2D24; --ink2: #6A6E5C; --ink3: #9BA08B;
+  --green: #7FA86B; --green-deep: #5F8A4C; --green-mist: #DCE7CE;
+  --dark: #232B1D; --danger: #C46A4A;
+}
+body { font-family: 'Segoe UI Variable Text', 'Segoe UI', 'Microsoft YaHei UI', system-ui, sans-serif; background: #1c1e17; color: var(--ink); }
+
+/* ---------- 顶部 HUD ---------- */
+.hud { position: sticky; top: 0; z-index: 50; display: flex; align-items: center; gap: 8px; padding: 12px 20px;
+  background: rgba(18, 20, 14, .92); backdrop-filter: blur(12px); flex-wrap: wrap; }
+.hud h1 { font-size: 15px; color: #EFEAD8; margin-right: 10px; }
+.hud .sub { font-size: 11.5px; color: #9aa08b; margin-right: auto; }
+.tab { border: 1px solid rgba(239, 234, 216, .25); background: transparent; color: #cfd4c2;
+  padding: 8px 16px; border-radius: 999px; cursor: pointer; font-size: 13px; font-family: inherit; transition: all .2s; }
+.tab.on { background: var(--cream); color: var(--dark); border-color: var(--cream); font-weight: 700; }
+
+.view { display: none; min-height: calc(100vh - 52px); }
+.view.on { display: block; }
+.vn { padding: 18px 26px 8px; display: flex; align-items: baseline; gap: 14px; }
+.vn b { font-size: 13px; letter-spacing: 2px; text-transform: uppercase; }
+.vn span { font-size: 12px; color: #9aa08b; line-height: 1.6; }
+
+/* ================================================================
+   方案一 · BENTO 命令甲板（侧栏 + Bento Grid + 命令栏）
+   骨架：左侧奶油纸侧栏（导航 + 迷你状态），主区顶部命令栏，
+   下方 Bento 拼块：状态即布局——异常的块会变大变亮。
+   侧栏可一键隐藏退化为纯 Bento 版（右上角按钮）。
+   ================================================================ */
+#v1 { background: var(--cream); }
+.v1wrap { display: grid; grid-template-columns: 212px 1fr; min-height: calc(100vh - 52px); }
+#v1.noside .v1wrap { grid-template-columns: 1fr; }
+#v1.noside .bento-side { display: none; }
+#v1.noside .bento { grid-template-columns: repeat(4, 1fr); }
+.bento-side { background: var(--paper); border-right: 1px solid var(--cream-2); padding: 18px 12px 14px;
+  display: flex; flex-direction: column; gap: 3px; }
+.bento-side .brandline { display: flex; align-items: center; gap: 10px; padding: 2px 8px 16px; }
+.bento-side .logo { width: 32px; height: 32px; border-radius: 10px; background: var(--dark); color: var(--cream);
+  display: grid; place-items: center; font-weight: 800; font-size: 14px; }
+.bento-side .brandline b { font-size: 14px; display: block; }
+.bento-side .brandline span { font-size: 10.5px; color: var(--ink3); }
+.bento-side .label { font-size: 10px; letter-spacing: 1.8px; color: var(--ink3); padding: 12px 10px 6px; font-weight: 700; }
+.bnav { display: flex; align-items: center; gap: 9px; padding: 9px 12px; border-radius: 10px; font-size: 13px;
+  cursor: pointer; color: var(--ink2); border: 0; background: transparent; font-family: inherit; width: 100%; text-align: left; transition: background .15s; }
+.bnav:hover { background: var(--green-mist); color: var(--ink); }
+.bnav.on { background: var(--dark); color: var(--cream); font-weight: 650; }
+.bnav.on .bdot { background: #b9d48e; }
+.bnav .bdot { width: 6px; height: 6px; border-radius: 50%; background: var(--cream-2); flex: 0 0 6px; }
+.bnav .bsub { margin-left: auto; font-size: 10px; opacity: .65; }
+.bento-side .ministat { margin-top: auto; background: var(--green-mist); border-radius: 12px; padding: 11px 12px;
+  font-size: 11px; color: var(--green-deep); line-height: 1.8; }
+.bento-side .ministat b { display: flex; align-items: center; gap: 6px; font-size: 11.5px; }
+.bento-side .ministat b i { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pk 2s infinite; }
+.bento-top { position: sticky; top: 52px; z-index: 30; display: flex; align-items: center; gap: 14px;
+  padding: 14px 26px; background: color-mix(in srgb, var(--cream) 86%, transparent); backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--cream-2); }
+.bento-top .side-toggle { border: 1px solid var(--cream-2); background: var(--paper); color: var(--ink2);
+  border-radius: 8px; padding: 7px 11px; font-size: 12px; cursor: pointer; font-family: inherit; }
+.bento-top .side-toggle:hover { border-color: var(--green); color: var(--green-deep); }
+.bento-top .logo { width: 30px; height: 30px; border-radius: 9px; background: var(--dark); color: var(--cream);
+  display: grid; place-items: center; font-weight: 800; font-size: 14px; }
+.cmdbar { flex: 1; display: flex; align-items: center; gap: 10px; background: var(--paper); border: 1.5px solid var(--cream-2);
+  border-radius: 12px; padding: 10px 16px; max-width: 560px; box-shadow: 0 2px 10px rgba(42,45,36,.06); }
+.cmdbar .k { font-size: 13px; color: var(--ink2); }
+.cmdbar kbd { margin-left: auto; font-size: 10.5px; background: var(--cream-2); padding: 3px 7px; border-radius: 5px; color: var(--ink2); }
+.bento-top .st { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; color: var(--green-deep); }
+.bento-top .st i { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: pk 2s infinite; }
+@keyframes pk { 50% { opacity: .3; } }
+.bento { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; padding: 20px 26px 60px; }
+.bx { background: var(--paper); border-radius: 18px; padding: 18px; border: 1px solid rgba(42,45,36,.06);
+  transition: transform .2s, box-shadow .2s; cursor: pointer; position: relative; overflow: hidden; }
+.bx:hover { transform: translateY(-3px); box-shadow: 0 10px 28px rgba(42,45,36,.12); }
+.bx h4 { font-size: 12px; color: var(--ink2); font-weight: 650; letter-spacing: .5px; display: flex; align-items: center; gap: 6px; }
+.bx .big { font-size: 30px; font-weight: 800; letter-spacing: -1px; margin-top: 8px; }
+.bx .sub { font-size: 11.5px; color: var(--ink3); margin-top: 3px; }
+.bx-hero { grid-column: span 2; grid-row: span 2; background: linear-gradient(150deg, var(--dark), #31402a); color: var(--cream); }
+.bx-hero h4 { color: #b9c6a8; }
+.bx-hero .big { font-size: 40px; color: #fff; }
+.bx-hero .live { margin-top: 14px; display: flex; flex-direction: column; gap: 9px; }
+.bx-hero .ln { display: flex; align-items: center; gap: 9px; font-size: 12px; background: rgba(255,255,255,.07); padding: 8px 11px; border-radius: 9px; }
+.bx-hero .ln .av { width: 22px; height: 22px; border-radius: 50%; background: var(--green); display: grid; place-items: center; font-size: 10px; font-weight: 800; color: #fff; }
+.bx-hero .ln .who { font-weight: 700; }
+.bx-hero .ln .tx { opacity: .75; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bx-hero .ln .tm { margin-left: auto; opacity: .5; font-size: 10.5px; }
+.bx-toggle { display: flex; align-items: center; justify-content: space-between; }
+.bx-toggle .tg { width: 44px; height: 24px; border-radius: 999px; background: var(--green); position: relative; }
+.bx-toggle .tg::after { content: ''; position: absolute; top: 3px; right: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; }
+.bx-toggle.off .tg { background: var(--cream-2); }
+.bx-toggle.off .tg::after { right: auto; left: 3px; }
+.bx .meter { height: 7px; border-radius: 6px; background: var(--cream-2); margin-top: 14px; overflow: hidden; }
+.bx .meter i { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--green), var(--green-deep)); }
+.bx .chiprow { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.bx .chip { font-size: 10.5px; padding: 4px 10px; border-radius: 999px; background: var(--green-mist); color: var(--green-deep); font-weight: 650; }
+.bx .chip.warn { background: #f0e3d8; color: var(--danger); }
+.bx-ring { display: grid; place-items: center; }
+.ring { width: 96px; height: 96px; border-radius: 50%; display: grid; place-items: center; position: relative;
+  background: conic-gradient(var(--green) 0 78%, var(--cream-2) 78% 100%); }
+.ring::before { content: ''; position: absolute; inset: 9px; background: var(--paper); border-radius: 50%; }
+.ring .rv { position: relative; text-align: center; }
+.ring .rv b { font-size: 20px; display: block; }
+.ring .rv span { font-size: 9.5px; color: var(--ink3); }
+
+/* ================================================================
+   方案二 · INBOX 沉浸流（邮箱式双栏 + 焦点阅读）
+   骨架：左窄栏（会话流）+ 右阅读区。所有通知按时间瀑布排布，
+   选中即"展开阅读"。顶部超薄工具条。像一封封待处理信件。
+   ================================================================ */
+#v2.on { background: var(--paper); display: grid; grid-template-columns: 340px 1fr; grid-template-rows: auto 1fr; min-height: calc(100vh - 52px); }
+.ib-tools { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; padding: 10px 20px;
+  border-bottom: 1px solid var(--cream-2); background: var(--cream); }
+.ib-tools .logo { font-weight: 800; font-size: 14px; color: var(--dark); margin-right: 6px; }
+.ib-tools .cnt { font-size: 12px; color: var(--ink2); }
+.ib-tools .sp { flex: 1; }
+.ib-tools button { border: 1px solid var(--cream-2); background: var(--paper); border-radius: 8px; padding: 6px 12px; font-size: 12px; cursor: pointer; font-family: inherit; color: var(--ink2); }
+.ib-tools button:hover { border-color: var(--green); color: var(--green-deep); }
+.ib-list { border-right: 1px solid var(--cream-2); overflow-y: auto; background: var(--paper); }
+.ib-item { display: flex; gap: 11px; padding: 13px 18px; border-bottom: 1px solid #efecdf; cursor: pointer; border-left: 3px solid transparent; }
+.ib-item:hover { background: #f1efe2; }
+.ib-item.on { background: var(--green-mist); border-left-color: var(--green); }
+.ib-item .av { width: 36px; height: 36px; border-radius: 12px; flex: 0 0 36px; display: grid; place-items: center; font-weight: 800; font-size: 13px; color: #fff; }
+.ib-item .m { flex: 1; min-width: 0; }
+.ib-item .l1 { display: flex; align-items: baseline; gap: 7px; }
+.ib-item .nm { font-weight: 750; font-size: 13px; }
+.ib-item .tm { margin-left: auto; font-size: 10.5px; color: var(--ink3); }
+.ib-item .pv { font-size: 12px; color: var(--ink2); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ib-item.unread .pv { color: var(--ink); font-weight: 600; }
+.ib-item.unread .nm::before { content: ''; display: inline-block; width: 7px; height: 7px; background: var(--green); border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+.ib-read { padding: 30px 40px; overflow-y: auto; }
+.ib-read .letter { max-width: 560px; }
+.ib-read .lt-head { border-bottom: 2px solid var(--dark); padding-bottom: 18px; margin-bottom: 20px; }
+.ib-read .lt-head .grp { font-size: 11px; letter-spacing: 2px; color: var(--green-deep); font-weight: 800; text-transform: uppercase; }
+.ib-read .lt-head h2 { font-size: 24px; margin-top: 6px; letter-spacing: -.5px; }
+.ib-read .lt-head .meta { font-size: 12px; color: var(--ink3); margin-top: 8px; display: flex; gap: 14px; }
+.ib-read .lt-body { font-size: 15px; line-height: 1.9; color: var(--ink); }
+.ib-read .lt-acts { display: flex; gap: 10px; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--cream-2); }
+.ib-read .act { padding: 9px 18px; border-radius: 10px; font-size: 13px; cursor: pointer; border: 1px solid var(--cream-2); background: var(--paper); font-family: inherit; color: var(--ink2); }
+.ib-read .act.main { background: var(--dark); color: var(--cream); border-color: var(--dark); font-weight: 650; }
+.ib-read .act:hover { border-color: var(--green); color: var(--green-deep); }
+.ib-read .act.main:hover { background: var(--green-deep); color: #fff; }
+.ib-side { padding: 22px 26px; border-left: 1px solid var(--cream-2); background: var(--cream); }
+.ib-side h5 { font-size: 11px; letter-spacing: 1.6px; color: var(--ink3); margin-bottom: 14px; }
+.ib-side .stat-l { display: flex; justify-content: space-between; font-size: 12.5px; padding: 9px 0; border-bottom: 1px dashed var(--cream-2); }
+.ib-side .stat-l b { color: var(--green-deep); }
+
+/* ================================================================
+   方案三 · TERMINAL 任务控制台（HUD 密度 + 状态即界面）
+   骨架：深色三栏等宽面板，等宽字体，全键盘导向。
+   没有装饰性控件——每行就是数据本身，选中即高亮行。
+   淡奶油绿在深色上成为信号色。
+   ================================================================ */
+#v3 { background: #14170f; color: #d8dcc8; font-family: 'Cascadia Mono', Consolas, monospace; padding: 0; }
+.t3-bar { display: flex; align-items: center; gap: 16px; padding: 10px 20px; border-bottom: 1px solid #2a3122; font-size: 12px; }
+.t3-bar .lg { color: #b9d48e; font-weight: 700; }
+.t3-bar .sys { color: #7c8570; }
+.t3-bar .sig { margin-left: auto; color: #b9d48e; }
+.t3-bar .sig::before { content: '● '; animation: pk 1.6s infinite; }
+.t3-grid { display: grid; grid-template-columns: 240px 1fr 300px; min-height: 60vh; }
+.t3-col { border-right: 1px solid #2a3122; }
+.t3-col:last-child { border-right: 0; }
+.t3-col h6 { font-size: 10px; letter-spacing: 2px; color: #7c8570; padding: 12px 16px 8px; border-bottom: 1px solid #2a3122; }
+.t3-row { padding: 8px 16px; font-size: 12.5px; display: flex; gap: 10px; border-bottom: 1px solid #1d2216; cursor: pointer; }
+.t3-row:hover { background: #1a1f13; }
+.t3-row.on { background: #232b1d; box-shadow: inset 2px 0 0 #b9d48e; }
+.t3-row .tm { color: #6a7360; }
+.t3-row .st-c { color: #b9d48e; }
+.t3-row .st-w { color: #d9a878; }
+.t3-feed { padding: 14px 20px; font-size: 12.5px; line-height: 2.1; }
+.t3-feed .fl { display: flex; gap: 12px; }
+.t3-feed .fl .t { color: #6a7360; flex: 0 0 46px; }
+.t3-feed .fl .w { color: #b9d48e; font-weight: 700; flex: 0 0 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.t3-feed .fl.hot { background: rgba(185, 212, 142, .08); }
+.t3-panel { padding: 16px 18px; font-size: 12px; }
+.t3-panel .kv { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px dashed #2a3122; }
+.t3-panel .kv b { color: #b9d48e; font-weight: 600; }
+.t3-cmd { display: flex; align-items: center; gap: 8px; padding: 10px 20px; border-top: 1px solid #2a3122; font-size: 12.5px; }
+.t3-cmd .pr { color: #b9d48e; }
+.t3-cmd .crsr { width: 8px; height: 14px; background: #b9d48e; animation: pk 1s steps(1) infinite; }
+
+/* ================================================================
+   方案四 · EDITORIAL 通知刊物（杂志网格 + 大字排版）
+   骨架：无侧栏、无工具栏。页面即"本期刊物"——报头 + 非对称
+   杂志网格：重要通知是大图块，普通的是栏目条目。
+   排版驱动设计，奶油绿是刊物的主题色。
+   ================================================================ */
+#v4 { background: var(--paper); padding: 34px 48px 80px; }
+.ed-mast { display: flex; align-items: flex-end; justify-content: space-between; border-bottom: 3px double var(--dark); padding-bottom: 16px; }
+.ed-mast h1 { font-family: Georgia, 'Source Han Serif SC', serif; font-size: 40px; letter-spacing: 1px; }
+.ed-mast h1 em { color: var(--green-deep); font-style: normal; }
+.ed-mast .date { text-align: right; font-size: 12px; color: var(--ink2); line-height: 1.7; }
+.ed-rule { display: flex; gap: 0; border-bottom: 1px solid var(--dark); margin: 14px 0 26px; }
+.ed-rule span { padding: 8px 18px; font-size: 12px; letter-spacing: 1.5px; border-right: 1px solid var(--dark); cursor: pointer; }
+.ed-rule span.on { background: var(--dark); color: var(--paper); }
+.ed-grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 0; border-top: 1px solid var(--line2, #d8d4c4); }
+.ed-feature { padding: 26px 30px 26px 0; border-right: 1px solid #d8d4c4; }
+.ed-feature .kick { font-size: 11px; letter-spacing: 2.5px; color: var(--green-deep); font-weight: 800; }
+.ed-feature h2 { font-family: Georgia, 'Source Han Serif SC', serif; font-size: 30px; line-height: 1.35; margin: 10px 0 14px; }
+.ed-feature p { font-size: 14px; line-height: 1.9; color: var(--ink2); }
+.ed-feature .meta { margin-top: 18px; font-size: 11.5px; color: var(--ink3); display: flex; gap: 16px; }
+.ed-feature .meta b { color: var(--dark); }
+.ed-col { display: flex; flex-direction: column; }
+.ed-item { padding: 17px 0 17px 26px; border-bottom: 1px solid #d8d4c4; cursor: pointer; }
+.ed-item:first-child { padding-top: 26px; }
+.ed-item:hover .ei-h { color: var(--green-deep); }
+.ed-item .ei-kick { font-size: 10px; letter-spacing: 2px; color: var(--ink3); font-weight: 700; }
+.ed-item .ei-h { font-size: 15px; font-weight: 700; margin: 5px 0 4px; transition: color .15s; }
+.ed-item .ei-p { font-size: 12.5px; color: var(--ink2); line-height: 1.65; }
+.ed-lower { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 30px; margin-top: 34px; padding-top: 24px; border-top: 1px solid var(--dark); }
+.ed-lower h5 { font-size: 11px; letter-spacing: 2.5px; color: var(--green-deep); border-bottom: 2px solid var(--dark); padding-bottom: 8px; margin-bottom: 12px; }
+.ed-mini { display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px dotted #cfcaba; font-size: 12.5px; }
+.ed-mini .t { color: var(--ink3); flex: 0 0 42px; }
+.ed-ctrl { display: flex; align-items: center; gap: 10px; padding: 10px 0; }
+.ed-ctrl .sw { width: 36px; height: 20px; border-radius: 999px; background: var(--green); position: relative; cursor: pointer; }
+.ed-ctrl .sw::after { content: ''; position: absolute; top: 3px; right: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--paper); }
+.ed-ctrl .sw.off { background: #cfcaba; }
+.ed-ctrl .sw.off::after { right: auto; left: 3px; }
+.ed-ctrl span { font-size: 13px; }
+</style>
+</head>
+<body>
+
+<div class="hud">
+  <h1>PingNest UI 重构 v2</h1>
+  <span class="sub">四种骨架 · 非换肤 · 奶油绿为共同主色</span>
+  <button class="tab on" data-v="v1">壹 · Bento 主页</button>
+  <button class="tab" data-v="v2">贰 · Inbox 沉浸流</button>
+  <button class="tab" data-v="v3">叁 · 控制台 HUD</button>
+  <button class="tab" data-v="v4">肆 · 通知刊物</button>
+</div>
+
+<!-- ================= 壹 · BENTO（侧栏版） ================= -->
+<style>
+  .page { display: none; padding: 18px 26px 60px; }
+  .page.on { display: block; }
+  .ph { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 16px; gap: 12px; flex-wrap: wrap; }
+  .ph h3 { font-size: 21px; letter-spacing: -.3px; }
+  .ph p { font-size: 12px; color: var(--ink2); margin-top: 4px; }
+  .ph .acts { display: flex; gap: 8px; align-items: center; }
+  .abtn { border: 1px solid var(--cream-2); background: var(--paper); color: var(--ink2); border-radius: 9px;
+    padding: 8px 14px; font-size: 12.5px; cursor: pointer; font-family: inherit; transition: all .15s; }
+  .abtn:hover { border-color: var(--green); color: var(--green-deep); }
+  .abtn.main { background: var(--dark); color: var(--cream); border-color: var(--dark); font-weight: 650; }
+  .abtn.main:hover { background: var(--green-deep); color: #fff; }
+  .abtn.dng { color: var(--danger); }
+  .abtn.dng:hover { border-color: var(--danger); background: #f6e8e0; color: var(--danger); }
+  .greet { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; flex-wrap: wrap; }
+  .greet h3 { font-size: 22px; letter-spacing: -.3px; }
+  .greet .gd { color: var(--ink2); font-size: 12.5px; margin-top: 3px; }
+  .greet .sp { flex: 1; }
+  .segf { display: inline-flex; background: var(--cream-2); border-radius: 9px; padding: 3px; gap: 2px; }
+  .segf button { border: 0; background: transparent; padding: 6px 13px; font-size: 12px; border-radius: 7px;
+    cursor: pointer; color: var(--ink2); font-family: inherit; font-weight: 600; }
+  .segf button.on { background: var(--paper); color: var(--green-deep); box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  .hrow { display: flex; align-items: center; gap: 11px; padding: 11px 16px; border-bottom: 1px solid #efecdf; cursor: pointer; }
+  .hrow:last-child { border-bottom: 0; }
+  .hrow:hover { background: #f1f5e9; }
+  .hrow .hav { width: 34px; height: 34px; border-radius: 11px; flex: 0 0 34px; display: grid; place-items: center; font-weight: 750; font-size: 12.5px; color: #fff; }
+  .hrow .hm { flex: 1; min-width: 0; }
+  .hrow .h1 { display: flex; align-items: baseline; gap: 7px; }
+  .hrow .hn { font-size: 13px; font-weight: 700; }
+  .hrow .hg { font-size: 10.5px; color: var(--ink3); }
+  .hrow .ht { margin-left: auto; font-size: 10.5px; color: var(--ink3); }
+  .hrow .h2 { font-size: 12px; color: var(--ink2); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hrow.unread .h2 { color: var(--ink); font-weight: 600; }
+  .hrow.unread .hn::before { content: ''; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--green); margin-right: 6px; vertical-align: 1px; }
+  .hrow.on { background: var(--green-mist); box-shadow: inset 3px 0 0 var(--green); }
+  .srow { display: flex; align-items: center; gap: 14px; padding: 13px 17px; border-bottom: 1px solid #efecdf; }
+  .srow:last-child { border-bottom: 0; }
+  .srow .st { flex: 1; }
+  .srow .st b { font-size: 13px; display: block; }
+  .srow .st span { font-size: 11.5px; color: var(--ink2); }
+  .tswitch { width: 38px; height: 22px; flex: 0 0 38px; border-radius: 999px; background: var(--green); position: relative; cursor: pointer; }
+  .tswitch::after { content: ''; position: absolute; top: 3px; right: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+  .tswitch.off { background: var(--cream-2); }
+  .tswitch.off::after { right: auto; left: 3px; }
+  .kv2 { display: flex; justify-content: space-between; align-items: baseline; padding: 7px 0; border-bottom: 1px dashed #e6e2d2; font-size: 12px; color: var(--ink2); }
+  .kv2 b { color: var(--ink); font-weight: 650; }
+  .sw2 { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; font-size: 12.5px; }
+  .logo-img { width: 32px; height: 32px; border-radius: 10px; display: block; flex: 0 0 32px; }
+  .side-collapse { width: calc(100% - 8px); margin: 8px 4px 0; font-size: 11.5px; padding: 7px 10px; }
+  .reopen { position: fixed; top: 64px; left: 12px; z-index: 45; width: 36px; height: 36px; border-radius: 10px;
+    border: 1px solid var(--cream-2); background: var(--paper); color: var(--ink2); font-size: 15px; cursor: pointer;
+    display: none; place-items: center; font-family: inherit; }
+  .reopen:hover { border-color: var(--green); color: var(--green-deep); }
+  #v1.noside .reopen { display: grid; }
+  /* 九套缩微预览 */
+  .spv { height: 44px; border-radius: 10px; margin-bottom: 8px; position: relative; overflow: hidden;
+    display: flex; align-items: center; gap: 6px; padding: 0 9px; }
+  .spv i { display: block; height: 4px; border-radius: 3px; background: currentColor; opacity: .55; }
+  .spv-capsule { background: linear-gradient(180deg, #1c221c, #10150f); color: #dce7ce; border-radius: 999px; }
+  .spv-capsule .d { width: 14px; height: 14px; border-radius: 50%; background: var(--green); flex: 0 0 14px; }
+  .spv-tidal { background: linear-gradient(120deg, rgba(255,255,255,.75), rgba(255,255,255,.35)); color: var(--green-deep);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.6), inset 3px 0 0 var(--green); backdrop-filter: blur(4px); }
+  .spv-term { background: #0c1110; color: #7ce8c8; font-family: Consolas, monospace; }
+  .spv-term .dots { display: flex; gap: 3px; position: absolute; top: 5px; left: 8px; }
+  .spv-term .dots i2 { width: 4px; height: 4px; border-radius: 50%; background: #27c93f; }
+  .spv-mail { background: repeating-linear-gradient(0deg, rgba(0,0,0,.015) 0 1px, transparent 1px 3px), linear-gradient(175deg, #fbf8ef, #f4eedd);
+    color: #6e5f34; border: 1px solid #d8cfae; outline: 1px solid rgba(120,105,60,.25); outline-offset: -3px; font-style: italic; }
+  .spv-mail .stamp { position: absolute; right: 6px; top: 6px; width: 16px; height: 16px; border: 1px dashed #8a7440; border-radius: 50%; opacity: .6; }
+  .spv-neon { background: linear-gradient(140deg, #0b0b16, #12101f); color: #b9b0ff; }
+  .spv-neon::before { content: ''; position: absolute; left: -8px; top: -8px; width: 34px; height: 34px; border-radius: 50%;
+    background: conic-gradient(from 200deg, transparent, #7c6cff 14%, #38e8ff 26%, transparent 38%); filter: blur(4px); }
+  .spv-wave { background: var(--paper); border: 1px solid var(--cream-2); color: var(--green); }
+  .spv-wave .eq { display: flex; align-items: flex-end; gap: 2px; height: 22px; flex: 0 0 20px; }
+  .spv-wave .eq i { width: 3px; background: var(--green); opacity: .9; }
+  .spv-wave .eq i:nth-child(1) { height: 8px; } .spv-wave .eq i:nth-child(2) { height: 18px; }
+  .spv-wave .eq i:nth-child(3) { height: 12px; } .spv-wave .eq i:nth-child(4) { height: 20px; }
+  .spv-wave .eq i:nth-child(5) { height: 9px; }
+  .spv-hex { background: transparent; }
+  .spv-hex .hex { width: 34px; height: 38px; clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+    background: linear-gradient(135deg, #679453, #4d7a3f); margin: 0 auto; }
+  .spv-scroll { background: linear-gradient(#fdfcf7, #f0ecdd); color: #6e6a52; border: 1px dashed #b9b28f;
+    font-family: Consolas, monospace; }
+  .spv-halo { background: var(--paper); border: 1px solid var(--cream-2); color: var(--ink2); }
+  .spv-halo .ring2 { width: 26px; height: 26px; border-radius: 50%; flex: 0 0 26px;
+    background: conic-gradient(var(--green) 0 72%, var(--cream-2) 72% 100%); position: relative; }
+  .spv-halo .ring2::after { content: ''; position: absolute; inset: 4px; border-radius: 50%; background: var(--paper); }
+  .stygrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .sty { background: var(--paper); border: 1.5px solid var(--cream-2); border-radius: 13px; padding: 12px; cursor: pointer; transition: all .15s; }
+  .sty:hover { border-color: var(--green); }
+  .sty.on { border-color: var(--green); background: var(--green-mist); }
+  .sty .sb { height: 26px; border-radius: 8px; margin-bottom: 8px; display: flex; align-items: center; gap: 5px; padding: 0 8px; }
+  .sty .sb i { display: block; height: 4px; border-radius: 3px; background: currentColor; opacity: .5; }
+  .sty b { font-size: 12px; display: block; }
+  .sty span { font-size: 10.5px; color: var(--ink3); }
+  .posgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-width: 300px; }
+  .pos { aspect-ratio: 1.6; border-radius: 9px; border: 1.5px solid var(--cream-2); background: var(--paper); cursor: pointer; display: grid; place-items: center; }
+  .pos i { width: 14px; height: 8px; border-radius: 4px; background: var(--cream-2); }
+  .pos:hover { border-color: var(--green); }
+  .pos.on { border-color: var(--green); background: var(--green-mist); }
+  .pos.on i { background: var(--green); }
+  .lrow { display: flex; align-items: center; gap: 12px; padding: 11px 17px; border-bottom: 1px solid #efecdf; }
+  .rg { display: flex; align-items: center; gap: 12px; padding: 11px 17px; border-bottom: 1px solid #efecdf; }
+  .rg:last-child { border-bottom: 0; }
+  .rg input[type=range] { flex: 1; accent-color: var(--green); }
+  .rg em { font-style: normal; font-size: 12px; font-weight: 700; color: var(--green-deep); min-width: 40px; text-align: right; }
+</style>
+<div class="view on" id="v1">
+<div class="v1wrap">
+  <aside class="bento-side">
+    <div class="brandline">
+      <img class="logo-img" src="/icon.png" alt="PingNest" />
+      <div><b>PingNest</b><span>通知伴侣</span></div>
+    </div>
+    <div class="label">工作台</div>
+    <button class="bnav on" data-page="home"><span class="bdot"></span>主页</button>
+    <button class="bnav" data-page="history"><span class="bdot"></span>历史<span class="bsub">128</span></button>
+    <button class="bnav" data-page="rules"><span class="bdot"></span>静音规则<span class="bsub">2</span></button>
+    <div class="label">偏好</div>
+    <button class="bnav" data-page="appearance"><span class="bdot"></span>外观</button>
+    <button class="bnav" data-page="settings"><span class="bdot"></span>设置</button>
+    <button class="bnav" data-page="about"><span class="bdot"></span>关于</button>
+    <div class="ministat">
+      <b><i></i>微信已连接</b>
+      WCDB 已解密 · 2s 轮询<br />健康度 92%
+    </div>
+  <button class="abtn side-collapse" id="sideCollapse">⇤ 收起侧栏</button>
+  </aside>
+  <div class="v1main">
+    <button class="reopen" id="sideReopen" title="展开侧栏">☰</button>
+    <div class="bento-top">
+      <div class="cmdbar"><span class="k">⌕ 搜索或输入命令…</span><kbd>Ctrl K</kbd></div>
+      <div class="st"><i></i>监听中</div>
+    </div>
+
+    <!-- ===== 主页 ===== -->
+    <div class="page on" id="pg-home">
+      <div class="greet">
+        <div><h3>下午好</h3><div class="gd">2026 年 8 月 30 日 · 星期日 · 通知一切正常</div></div>
+        <span class="sp"></span>
+        <button class="abtn">立即检查</button>
+        <button class="abtn main">重新连接</button>
+      </div>
+      <div class="bento" style="padding:0;">
+        <div class="bx bx-hero">
+          <h4>实时消息流</h4>
+          <div class="big">23<small style="font-size:14px;opacity:.6"> 条 · 今日</small></div>
+          <div class="live">
+            <div class="ln"><span class="av">张</span><span class="who">张三</span><span class="tx">今晚 8 点前把方案发我，需要最后评审</span><span class="tm">21:42</span></div>
+            <div class="ln"><span class="av" style="background:#b39a6b">李</span><span class="who">李四</span><span class="tx">撤回了一条消息</span><span class="tm">21:30</span></div>
+            <div class="ln"><span class="av" style="background:#7d96ab">产</span><span class="who">产品群</span><span class="tx">王五: 会议纪要已上传</span><span class="tm">21:12</span></div>
+            <div class="ln"><span class="av" style="background:#ab8b9a">赵</span><span class="who">赵六</span><span class="tx">[图片]</span><span class="tm">20:58</span></div>
+            <div class="ln"><span class="av" style="background:#6b8a9a">钱</span><span class="who">钱七</span><span class="tx">收到，明天对齐细节</span><span class="tm">20:41</span></div>
+          </div>
+        </div>
+        <div class="bx">
+          <h4>未读</h4>
+          <div class="big" style="color:var(--green-deep)">6</div>
+          <div class="sub">3 个会话待处理</div>
+        </div>
+        <div class="bx">
+          <h4>连接详情</h4>
+          <div class="kv2" style="margin-top:6px;"><span>微信进程</span><b>Weixin.exe</b></div>
+          <div class="kv2"><span>数据库</span><b>已解密</b></div>
+          <div class="kv2"><span>轮询间隔</span><b>2 秒</b></div>
+          <div class="meter"><i style="width:92%"></i></div>
+          <div class="sub" style="margin-top:5px">连接健康度 92%</div>
+        </div>
+        <div class="bx">
+          <h4>静音规则</h4>
+          <div class="big">2</div>
+          <div class="chiprow"><span class="chip">广告关键词</span><span class="chip">某某群</span><span class="chip warn">1 条停用</span></div>
+        </div>
+        <div class="bx" style="grid-column: span 2;">
+          <h4>最近会话</h4>
+          <div style="margin-top:8px;">
+            <div class="hrow"><div class="hav" style="background:linear-gradient(135deg,#8fae76,#5d8a4a)">张</div><div class="hm"><div class="h1"><span class="hn">张三</span><span class="hg">私聊</span><span class="ht">21:42</span></div><div class="h2">今晚 8 点前把方案发我，我们需要做最后评审</div></div><span class="chip">3 新</span></div>
+            <div class="hrow"><div class="hav" style="background:linear-gradient(135deg,#7d96ab,#4e6f8a)">产</div><div class="hm"><div class="h1"><span class="hn">产品设计群</span><span class="hg">群聊</span><span class="ht">21:12</span></div><div class="h2">王五: 会议纪要已上传，请查收</div></div><span class="chip">9 新</span></div>
+            <div class="hrow"><div class="hav" style="background:linear-gradient(135deg,#ab8b9a,#7d5a6c)">赵</div><div class="hm"><div class="h1"><span class="hn">赵六</span><span class="hg">私聊</span><span class="ht">20:58</span></div><div class="h2">[图片]</div></div></div>
+          </div>
+        </div>
+        <div class="bx">
+          <h4>今日概览</h4>
+          <div class="kv2" style="margin-top:6px;"><span>已推送弹窗</span><b>17 条</b></div>
+          <div class="kv2"><span>静音拦截</span><b>4 条</b></div>
+          <div class="kv2"><span>撤回捕获</span><b>1 条</b></div>
+        </div>
+        <div class="bx">
+          <h4>本地历史</h4>
+          <div class="big">128</div>
+          <div class="sub">保留 30 天</div>
+          <div class="meter"><i style="width:64%"></i></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 历史 ===== -->
+    <div class="page" id="pg-history">
+      <div class="ph">
+        <div><h3>历史</h3><p>6 个会话 · 128 条本地记录 · 保留 30 天</p></div>
+        <div class="acts"><button class="abtn">导出</button><button class="abtn dng">清空历史</button></div>
+      </div>
+      <div style="background:var(--paper); border:1px solid var(--cream-2); border-radius:14px; margin-bottom:14px; display:flex; align-items:center; gap:10px; padding:12px 16px; flex-wrap:wrap;">
+        <div class="cmdbar" style="max-width:320px; box-shadow:none; padding:8px 13px;"><span class="k">⌕ 搜索联系人、群聊或消息</span></div>
+        <div class="segf"><button class="on">全部</button><button>私聊</button><button>群聊</button><button>公众号</button></div>
+        <span style="margin-left:auto; font-size:11.5px; color:var(--ink3);">23 条今日</span>
+      </div>
+      <div class="bento" style="padding:0; grid-template-columns: 1.2fr 1fr;">
+        <div class="bx" style="padding:6px 0;">
+          <div class="hrow on"><div class="hav" style="background:linear-gradient(135deg,#8fae76,#5d8a4a)">张</div><div class="hm"><div class="h1"><span class="hn">张三</span><span class="ht">21:42</span></div><div class="h2">今晚 8 点前把方案发我，我们需要做最后评审</div></div><span class="chip">3 新</span></div>
+          <div class="hrow"><div class="hav" style="background:linear-gradient(135deg,#b39a6b,#8a7440)">李</div><div class="hm"><div class="h1"><span class="hn">李四</span><span class="ht">21:30</span></div><div class="h2">撤回了一条消息</div></div></div>
+          <div class="hrow"><div class="hav" style="background:linear-gradient(135deg,#7d96ab,#4e6f8a)">产</div><div class="hm"><div class="h1"><span class="hn">产品设计群</span><span class="ht">21:12</span></div><div class="h2">王五: 会议纪要已上传，请查收</div></div><span class="chip gray">9 条</span></div>
+          <div class="hrow"><div class="hav" style="background:linear-gradient(135deg,#ab8b9a,#7d5a6c)">赵</div><div class="hm"><div class="h1"><span class="hn">赵六</span><span class="ht">20:58</span></div><div class="h2">[图片]</div></div></div>
+        </div>
+        <div class="bx">
+          <div class="kv2" style="margin-bottom:4px;"><span style="font-size:10.5px; letter-spacing:2px; color:var(--green-deep); font-weight:800;">私聊 · 已弹窗</span></div>
+          <div style="font-size:22px; font-weight:800; letter-spacing:-.4px;">张三</div>
+          <div style="font-size:11px; color:var(--ink3); margin:5px 0 14px;">今天 21:42 · 微信 4.0</div>
+          <div style="font-size:14px; line-height:1.9; color:var(--ink); background:var(--cream); border-radius:11px; padding:14px 16px;">今晚 8 点前把方案发我，我们需要做最后评审。</div>
+          <div style="display:flex; gap:8px; margin-top:14px; flex-wrap:wrap;">
+            <button class="abtn main">打开微信</button><button class="abtn">复制内容</button><button class="abtn dng">删除</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 静音规则 ===== -->
+    <div class="page" id="pg-rules">
+      <div class="ph">
+        <div><h3>静音规则</h3><p>命中规则的消息只进历史，不弹桌面通知</p></div>
+        <button class="abtn main">+ 新建规则</button>
+      </div>
+      <div class="bento" style="padding:0; grid-template-columns: 1fr 1fr;">
+        <div class="bx">
+          <div style="display:flex; align-items:center; gap:8px;"><b style="font-size:14px;">广告关键词</b><span class="chip">生效中</span><span style="margin-left:auto;" class="tswitch"></span></div>
+          <div class="sub" style="margin:8px 0 10px;">满足任一条件即静音</div>
+          <div class="chiprow"><span class="chip">广告</span><span class="chip">优惠</span><span class="chip">促销</span></div>
+          <div class="sub" style="margin-top:10px;">范围：所有会话</div>
+          <div style="display:flex; gap:8px; margin-top:12px;"><button class="abtn">编辑</button><button class="abtn dng">删除</button></div>
+        </div>
+        <div class="bx">
+          <div style="display:flex; align-items:center; gap:8px;"><b style="font-size:14px;">某某群 全静音</b><span class="chip">生效中</span><span style="margin-left:auto;" class="tswitch"></span></div>
+          <div class="sub" style="margin:8px 0 10px;">指定会话全量静音</div>
+          <div class="chiprow"><span class="chip">某某群</span></div>
+          <div class="sub" style="margin-top:10px;">范围：仅选中会话</div>
+          <div style="display:flex; gap:8px; margin-top:12px;"><button class="abtn">编辑</button><button class="abtn dng">删除</button></div>
+        </div>
+        <div class="bx" style="border-style:dashed; display:grid; place-items:center; min-height:130px; color:var(--ink3); font-size:13px;">
+          + 新建一条规则
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 外观 ===== -->
+    <div class="page" id="pg-appearance">
+      <div class="ph">
+        <div><h3>外观</h3><p>九种通知样式 · 位置 · 卡片大小 · 堆叠</p></div>
+      </div>
+      <div class="bento" style="padding:0;">
+        <div class="bx" style="grid-column: span 2;">
+          <h4>通知样式</h4>
+          <div class="stygrid" style="margin-top:12px;">
+            <div class="sty on"><div class="spv spv-capsule"><span class="d"></span><i style="width:34%"></i><i style="width:22%"></i><span style="margin-left:auto; display:flex; gap:2px; align-items:flex-end; height:12px;"><span style="width:2px; height:6px; background:var(--green); border-radius:1px;"></span><span style="width:2px; height:11px; background:var(--green); border-radius:1px;"></span><span style="width:2px; height:8px; background:var(--green); border-radius:1px;"></span></span></div><b>灵动胶囊</b><span>中心展开收拢</span></div>
+            <div class="sty"><div class="spv spv-tidal"><i style="width:38%"></i><i style="width:24%"></i></div><b>潮汐</b><span>液态玻璃流光</span></div>
+            <div class="sty"><div class="spv spv-term"><span class="dots"><i2></i2><i2 style="background:#ffbd2e"></i2><i2 style="background:#ff5f56"></i2></span><i style="width:30%; margin-top:10px;"></i><i style="width:46%"></i></div><b>终端</b><span>系统日志单行</span></div>
+            <div class="sty"><div class="spv spv-mail"><i style="width:44%"></i><span class="stamp"></span></div><b>信笺</b><span>纸纹时间邮戳</span></div>
+            <div class="sty"><div class="spv spv-neon"><i style="width:40%; background:#b9b0ff; opacity:.9;"></i><i style="width:24%; background:#9fd8e8; opacity:.8;"></i></div><b>霓虹弧光</b><span>旋转弧光</span></div>
+            <div class="sty"><div class="spv spv-wave"><span class="eq"><i></i><i></i><i></i><i></i><i></i></span><i style="width:32%"></i><i style="width:20%"></i></div><b>音轨</b><span>信号频谱</span></div>
+            <div class="sty"><div class="spv spv-hex"><span class="hex"></span></div><b>蜂巢</b><span>六边蜂室拼合</span></div>
+            <div class="sty"><div class="spv spv-scroll"><i style="width:26%"></i><i style="width:48%"></i></div><b>卷轴</b><span>热敏纸带</span></div>
+            <div class="sty"><div class="spv spv-halo"><span class="ring2"></span><i style="width:36%"></i><i style="width:22%"></i></div><b>呼吸圆环</b><span>倒计时圆环</span></div>
+          </div>
+        </div>
+        <div class="bx">
+          <h4>弹窗位置</h4>
+          <div class="posgrid" style="margin-top:12px;">
+            <div class="pos"><i></i></div><div class="pos"><i></i></div><div class="pos"><i></i></div>
+            <div class="pos"><i></i></div><div class="pos on"><i></i></div><div class="pos"><i></i></div>
+            <div class="pos"><i></i></div><div class="pos"><i></i></div><div class="pos"><i></i></div>
+          </div>
+          <div class="sub" style="margin-top:10px;">当前：右上角 · 跟随光标所在屏幕</div>
+        </div>
+        <div class="bx">
+          <h4>尺寸与堆叠</h4>
+          <div class="rg"><span style="font-size:12px; flex:0 0 64px;">卡片大小</span><div class="segf"><button>大</button><button class="on">中</button><button>小</button></div></div>
+          <div class="rg"><span style="font-size:12px; flex:0 0 64px;">堆叠数量</span><input type="range" min="1" max="6" value="3" /><em>3 张</em></div>
+          <div class="rg"><span style="font-size:12px; flex:0 0 64px;">持续时间</span><input type="range" min="3" max="15" value="5" /><em>5 秒</em></div>
+          <div class="rg"><span style="font-size:12px; flex:0 0 64px;">透明度</span><input type="range" min="70" max="100" value="90" /><em>90%</em></div>
+        </div>
+        <div class="bx">
+          <h4>其他</h4>
+          <div class="srow"><div class="st"><b>同会话合并</b><span>短时间连发折叠为一张</span></div><div class="tswitch"></div></div>
+          <div class="srow"><div class="st"><b>显示摘要</b><span>正文两行预览</span></div><div class="tswitch"></div></div>
+          <div class="srow"><div class="st"><b>通知提示音</b><span>合成音 · 无外部资源</span></div><div class="tswitch off"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 设置 ===== -->
+    <div class="page" id="pg-settings">
+      <div class="ph">
+        <div><h3>设置</h3><p>启动 · 监听 · 数据 · 隐私</p></div>
+      </div>
+      <div class="bento" style="padding:0; grid-template-columns:1fr 1fr;">
+        <div class="bx">
+          <h4>微信连接</h4>
+          <div class="kv2" style="margin-top:10px;"><span>账号</span><b>姜北尘</b></div>
+          <div class="kv2"><span>wxid</span><b>wxid_ab…12cd</b></div>
+          <div class="kv2"><span>数据目录</span><b>Documents/xwechat_files</b></div>
+          <div style="display:flex; gap:8px; margin-top:14px;"><button class="abtn">重新连接</button><button class="abtn">重新 Hook</button><button class="abtn dng">删除连接</button></div>
+        </div>
+        <div class="bx">
+          <h4>启动与托盘</h4>
+          <div class="srow"><div class="st"><b>开机启动</b><span>登录后运行至托盘</span></div><div class="tswitch off"></div></div>
+          <div class="srow"><div class="st"><b>关闭时隐藏到托盘</b><span>后台保持监听</span></div><div class="tswitch"></div></div>
+          <div class="srow"><div class="st"><b>隐藏时系统提示</b><span>首次隐藏提醒一次</span></div><div class="tswitch"></div></div>
+        </div>
+        <div class="bx">
+          <h4>监听与连接</h4>
+          <div class="srow"><div class="st"><b>断线自动重连</b><span>连接中断后自动恢复</span></div><div class="tswitch"></div></div>
+          <div class="rg"><span style="font-size:12px; flex:0 0 64px;">重连间隔</span><input type="range" min="1" max="15" value="3" /><em>3 秒</em></div>
+          <div class="rg"><span style="font-size:12px; flex:0 0 64px;">轮询间隔</span><input type="range" min="1" max="15" value="2" /><em>2 秒</em></div>
+        </div>
+        <div class="bx">
+          <h4>数据与隐私</h4>
+          <div class="kv2" style="margin-top:6px;"><span>历史保留</span><b>30 天</b></div>
+          <div class="kv2"><span>存储加密</span><b style="color:var(--green-deep)">safeStorage 已加密</b></div>
+          <div class="kv2"><span>本地记录</span><b>128 条</b></div>
+          <div style="display:flex; gap:8px; margin-top:14px;"><button class="abtn">清理过期记录</button><button class="abtn dng">清空通知历史</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 关于 ===== -->
+    <div class="page" id="pg-about">
+      <div class="ph"><div><h3>关于</h3><p>本地优先的 Windows 微信通知中心</p></div></div>
+      <div class="bento" style="padding:0;">
+        <div class="bx bx-hero" style="grid-column: span 2;">
+          <img src="/icon.png" alt="PingNest" style="width:56px; height:56px; border-radius:15px; display:block; margin-bottom:12px; box-shadow:0 8px 24px rgba(0,0,0,.35);" />
+          <h4>PINGNEST</h4>
+          <div class="big">v1.0.0</div>
+          <div class="sub" style="font-size:12.5px; line-height:1.9; margin-top:10px;">把重要的微信消息带到桌面，用更少的打扰换来更清晰的工作节奏。<br />九种通知样式 · 堆叠队列 · 静音规则 · 本地加密存储</div>
+        </div>
+        <div class="bx">
+          <h4>当前状态</h4>
+          <div class="kv2" style="margin-top:10px;"><span>微信账号</span><b>姜北尘</b></div>
+          <div class="kv2"><span>消息监听</span><b style="color:var(--green-deep)">正常运行</b></div>
+          <div class="kv2"><span>通知历史</span><b>128 条</b></div>
+        </div>
+        <div class="bx">
+          <h4>本地优先</h4>
+          <div class="sub" style="font-size:12px; line-height:2; margin-top:8px;">· 通知内容只留在这台设备<br />· 头像经微信 CDN 拉取<br />· safeStorage 加密存储<br />· 数据随时可彻底清除</div>
+        </div>
+        <div class="bx" style="grid-column: span 3;">
+          <h4>许可与致谢</h4>
+          <div class="sub" style="margin-top:8px;">CC BY-NC-SA 4.0 · 感谢 WeFlow 提供思路与参考 · 第三方许可清单见安装包 resources/licenses</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ================= 贰 · INBOX ================= -->
+<div class="view" id="v2">
+  <div class="ib-tools">
+    <span class="logo">PingNest</span>
+    <span class="cnt">6 条未读 · 23 条今日</span>
+    <span class="sp"></span>
+    <button>全部标为已读</button>
+    <button>筛选：全部 ▾</button>
+  </div>
+  <div class="ib-list">
+    <div class="ib-item unread on">
+      <div class="av" style="background:linear-gradient(135deg,#8fae76,#5d8a4a)">张</div>
+      <div class="m"><div class="l1"><span class="nm">张三</span><span class="tm">21:42</span></div><div class="pv">今晚 8 点前把方案发我，我们需要做最后评审…</div></div>
+    </div>
+    <div class="ib-item unread">
+      <div class="av" style="background:linear-gradient(135deg,#b39a6b,#8a7440)">李</div>
+      <div class="m"><div class="l1"><span class="nm">李四</span><span class="tm">21:30</span></div><div class="pv">撤回了一条消息</div></div>
+    </div>
+    <div class="ib-item">
+      <div class="av" style="background:linear-gradient(135deg,#7d96ab,#4e6f8a)">产</div>
+      <div class="m"><div class="l1"><span class="nm">产品设计群</span><span class="tm">21:12</span></div><div class="pv">王五: 会议纪要已上传，请查收</div></div>
+    </div>
+    <div class="ib-item">
+      <div class="av" style="background:linear-gradient(135deg,#ab8b9a,#7d5a6c)">赵</div>
+      <div class="m"><div class="l1"><span class="nm">赵六</span><span class="tm">20:58</span></div><div class="pv">[图片]</div></div>
+    </div>
+  </div>
+  <div class="ib-read">
+    <div class="letter">
+      <div class="lt-head">
+        <div class="grp">私聊 · 产品设计群</div>
+        <h2>张三</h2>
+        <div class="meta"><span>今天 21:42</span><span>·</span><span>微信 4.0</span><span>·</span><span>已弹窗</span></div>
+      </div>
+      <div class="lt-body">今晚 8 点前把方案发我，我们需要做最后评审。PPT 和原型一起打包，命名按上次的规范来。有问题随时电话。</div>
+      <div class="lt-acts">
+        <button class="act main">打开微信</button>
+        <button class="act">在历史中定位</button>
+        <button class="act">复制内容</button>
+        <button class="act" style="color:var(--danger)">删除记录</button>
+      </div>
+    </div>
+  </div>
+  <div class="ib-side">
+    <h5>运行状态</h5>
+    <div class="stat-l"><span>微信进程</span><b>运行中</b></div>
+    <div class="stat-l"><span>WCDB</span><b>已解密</b></div>
+    <div class="stat-l"><span>同步</span><b>21:42:03</b></div>
+    <div class="stat-l"><span>历史</span><b>128 条</b></div>
+    <h5 style="margin-top:24px">快捷开关</h5>
+    <div class="stat-l"><span>桌面弹窗</span><b>开</b></div>
+    <div class="stat-l"><span>通知历史</span><b>开</b></div>
+    <div class="stat-l"><span>声音</span><b>关</b></div>
+  </div>
+</div>
+
+<!-- ================= 叁 · 控制台 ================= -->
+<div class="view" id="v3">
+  <div class="t3-bar">
+    <span class="lg">PINGNEST//CTRL</span>
+    <span class="sys">wx.pid=8264 wcdb=decrypted poll=2s</span>
+    <span class="sig">LISTENING</span>
+  </div>
+  <div class="t3-grid">
+    <div class="t3-col">
+      <h6>SESSIONS</h6>
+      <div class="t3-row on"><span class="tm">21:42</span><span class="st-c">张三</span></div>
+      <div class="t3-row"><span class="tm">21:30</span><span class="st-w">李四 [revoke]</span></div>
+      <div class="t3-row"><span class="tm">21:12</span><span class="st-c">产品群</span></div>
+      <div class="t3-row"><span class="tm">20:58</span><span class="st-c">赵六</span></div>
+      <div class="t3-row"><span class="tm">20:41</span><span class="st-c">钱七</span></div>
+    </div>
+    <div class="t3-feed">
+      <div class="fl hot"><span class="t">21:42</span><span class="w">张三</span><span>今晚 8 点前把方案发我，我们需要做最后评审 ▌</span></div>
+      <div class="fl"><span class="t">21:30</span><span class="w">系统</span><span>李四 撤回了一条消息（原文已捕获：明天再聊）</span></div>
+      <div class="fl"><span class="t">21:12</span><span class="w">产品群</span><span>王五: 会议纪要已上传，请查收</span></div>
+      <div class="fl"><span class="t">20:58</span><span class="w">赵六</span><span>[图片] media-msg 已折叠</span></div>
+      <div class="fl"><span class="t">20:41</span><span class="w">钱七</span><span>收到，明天对齐细节</span></div>
+    </div>
+    <div class="t3-panel">
+      <h6 style="padding:0 0 10px; border:0;">STATUS</h6>
+      <div class="kv"><span>weixin.exe</span><b>alive</b></div>
+      <div class="kv"><span>db handle</span><b>open</b></div>
+      <div class="kv"><span>monitor</span><b>poll/2s</b></div>
+      <div class="kv"><span>history</span><b>128 rows</b></div>
+      <div class="kv"><span>rules</span><b>2 active</b></div>
+      <h6 style="padding:16px 0 10px; border:0;">TOGGLES</h6>
+      <div class="kv"><span>popup</span><b>[ON]</b></div>
+      <div class="kv"><span>history</span><b>[ON]</b></div>
+      <div class="kv"><span>sound</span><b>[OFF]</b></div>
+    </div>
+  </div>
+  <div class="t3-cmd"><span class="pr">pingnest&gt;</span><span>connect --watch</span><span class="crsr"></span></div>
+</div>
+
+<!-- ================= 肆 · EDITORIAL ================= -->
+<div class="view" id="v4">
+  <div class="ed-mast">
+    <h1>Ping<em>Nest</em> 通报</h1>
+    <div class="date">第 128 期 · 2026 年 8 月 29 日<br />微信连接正常 · 监听中</div>
+  </div>
+  <div class="ed-rule">
+    <span class="on">要闻</span><span>历史</span><span>静音规则</span><span>设置</span><span style="margin-left:auto; border:0;">23 条今日 · 6 条未读</span>
+  </div>
+  <div class="ed-grid">
+    <div class="ed-feature">
+      <div class="kick">置顶 · 私聊</div>
+      <h2>今晚 8 点前把方案发我，我们需要做最后评审。</h2>
+      <p>PPT 和原型一起打包，命名按上次的规范来。有问题随时电话——张三在产品设计群里同步了这个截止时间，王五会上传会议纪要作为附件。</p>
+      <div class="meta"><span><b>张三</b></span><span>21:42</span><span>产品设计群</span><span>已弹窗 · 未读</span></div>
+    </div>
+    <div class="ed-col">
+      <div class="ed-item">
+        <div class="ei-kick">撤回 · 21:30</div>
+        <div class="ei-h">李四 撤回了一条消息</div>
+        <div class="ei-p">原文已捕获：「明天再聊」</div>
+      </div>
+      <div class="ed-item">
+        <div class="ei-kick">群聊 · 21:12</div>
+        <div class="ei-h">会议纪要已上传，请查收</div>
+        <div class="ei-p">产品设计群 · 王五</div>
+      </div>
+      <div class="ed-item">
+        <div class="ei-kick">私聊 · 20:58</div>
+        <div class="ei-h">[图片]</div>
+        <div class="ei-p">赵六发送了一张图片</div>
+      </div>
+      <div class="ed-item">
+        <div class="ei-kick">私聊 · 20:41</div>
+        <div class="ei-h">收到，明天对齐细节</div>
+        <div class="ei-p">钱七</div>
+      </div>
+    </div>
+  </div>
+  <div class="ed-lower">
+    <div>
+      <h5>运行状态</h5>
+      <div class="ed-mini"><span class="t">21:42</span><span>微信进程运行中（PID 8264）</span></div>
+      <div class="ed-mini"><span class="t">21:42</span><span>数据库连接健康度 92%</span></div>
+      <div class="ed-mini"><span class="t">21:12</span><span>本地历史 128 条 · 保留 30 天</span></div>
+    </div>
+    <div>
+      <h5>静音规则</h5>
+      <div class="ed-mini"><span>「广告」「优惠」关键词 · 生效中</span></div>
+      <div class="ed-mini"><span>某某群 全静音 · 生效中</span></div>
+      <div class="ed-mini" style="color:var(--ink3)">+ 新建规则…</div>
+    </div>
+    <div>
+      <h5>偏好</h5>
+      <div class="ed-ctrl"><div class="sw"></div><span>桌面弹窗</span></div>
+      <div class="ed-ctrl"><div class="sw"></div><span>通知历史</span></div>
+      <div class="ed-ctrl"><div class="sw off"></div><span>提示音</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('.bnav').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.bnav').forEach(x => x.classList.remove('on'))
+    b.classList.add('on')
+    document.querySelectorAll('#v1 .page').forEach(p => p.classList.remove('on'))
+    document.getElementById('pg-' + b.dataset.page).classList.add('on')
+    window.scrollTo(0, 0)
+  }))
+  for (const id of ['sideCollapse', 'sideReopen']) {
+    document.getElementById(id)?.addEventListener('click', () => {
+      document.getElementById('v1').classList.toggle('noside')
+    })
+  }
+  const tabs = document.querySelectorAll('.tab')
+  tabs.forEach(t => {
+    t.onclick = () => {
+      tabs.forEach(x => x.classList.remove('on'))
+      t.classList.add('on')
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('on'))
+      document.getElementById(t.dataset.v).classList.add('on')
+    }
+  })
+</script>
+</body>
+</html>

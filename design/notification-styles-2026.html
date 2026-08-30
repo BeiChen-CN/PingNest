@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="color-scheme" content="light dark" />
+<title>PingNest · 通知样式 2026 重设计提案（9 组）</title>
+<style>
+/* ============================================================
+   PingNest 通知样式 2026 重设计提案
+   8 组大刀阔斧的方案，每组带核心动效与深浅双主题。
+   打开方式：dev 模式访问 http://localhost:3000/notification-styles-2026.html
+             或直接双击本文件。
+   选定后：旧 5 套样式（standard/compact/layered/minimal/island）
+   将整体移除，新样式按同名 token 接入应用。
+   ============================================================ */
+:root {
+  --ink: #1a1d1c; --ink-2: #57615f; --ink-3: #8a938f;
+  --paper: #f2f4f3; --card: #ffffff; --line: #dde3e1;
+  --accent: #006a6a; --accent-2: #0aa; --danger: #ba1a1a;
+  --wall-a: #dfe7e4; --wall-b: #c9d6d2; --wall-c: #b9c9c4;
+  --stage-shadow: 0 24px 60px rgba(20,30,28,.18);
+}
+html[data-theme="dark"] {
+  --ink: #e2e7e5; --ink-2: #9aa5a2; --ink-3: #6d7773;
+  --paper: #121615; --card: #1c2220; --line: #2c3431;
+  --accent: #4cdada; --accent-2: #7ee7e7; --danger: #ffb4ab;
+  --wall-a: #0d1110; --wall-b: #141b19; --wall-c: #1a2320;
+  --stage-shadow: 0 24px 60px rgba(0,0,0,.55);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Segoe UI Variable', 'Segoe UI', 'Microsoft YaHei UI', system-ui, sans-serif;
+  background: linear-gradient(160deg, var(--wall-a), var(--wall-b) 55%, var(--wall-c));
+  color: var(--ink); min-height: 100vh;
+  transition: background .4s ease, color .4s ease;
+}
+/* ---------- 顶部控制 ---------- */
+.hud {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 14px 28px;
+  background: color-mix(in srgb, var(--paper) 82%, transparent);
+  backdrop-filter: blur(18px);
+  border-bottom: 1px solid var(--line);
+}
+.hud h1 { font-size: 17px; letter-spacing: .5px; }
+.hud .sub { font-size: 12px; color: var(--ink-2); }
+.hud .spacer { flex: 1; }
+.hud button {
+  border: 1px solid var(--line); background: var(--card); color: var(--ink);
+  padding: 7px 16px; border-radius: 999px; font-size: 13px; cursor: pointer;
+  transition: all .2s;
+}
+.hud button:hover { border-color: var(--accent); color: var(--accent); }
+.hud button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+html[data-theme="dark"] .hud button.on { color: #062; }
+/* ---------- 舞台 ---------- */
+main { max-width: 1180px; margin: 0 auto; padding: 34px 28px 90px; }
+.stage { margin-bottom: 58px; }
+.stage-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
+.stage-head .tag {
+  font-size: 12px; font-weight: 700; color: var(--paper);
+  background: var(--ink); border-radius: 6px; padding: 3px 9px; letter-spacing: 1px;
+}
+.stage-head h2 { font-size: 20px; }
+.stage-head .en { font-size: 12px; color: var(--ink-3); letter-spacing: 2px; text-transform: uppercase; }
+.stage-desc { font-size: 13.5px; color: var(--ink-2); line-height: 1.7; max-width: 860px; margin-bottom: 16px; }
+.stage-desc b { color: var(--ink); }
+.stage-canvas {
+  position: relative; min-height: 320px; border-radius: 20px; overflow: hidden;
+  background:
+    radial-gradient(1200px 500px at 80% -10%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 60%),
+    linear-gradient(150deg, var(--wall-a), var(--wall-b) 60%, var(--wall-c));
+  border: 1px solid var(--line);
+  box-shadow: var(--stage-shadow);
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  padding: 40px 24px; gap: 18px;
+}
+.stage-canvas .wall-hint {
+  position: absolute; right: 16px; bottom: 12px; font-size: 11px; color: var(--ink-3);
+  letter-spacing: 1px;
+}
+/* ---------- 通用卡片骨架 ---------- */
+.nt { display: flex; align-items: center; gap: 13px; width: 400px; }
+.nt .avatar {
+  flex: 0 0 44px; width: 44px; height: 44px; border-radius: 50%;
+  display: grid; place-items: center; font-weight: 700; font-size: 17px; color: #fff;
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #7ab));
+}
+.nt .body { flex: 1; min-width: 0; }
+.nt .r1 { display: flex; align-items: baseline; gap: 8px; }
+.nt .name { font-weight: 700; font-size: 13.5px; }
+.nt .grp { font-size: 11.5px; color: var(--ink-2); }
+.nt .time { margin-left: auto; font-size: 11px; color: var(--ink-3); }
+.nt .content { font-size: 13px; color: var(--ink-2); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nt .badge {
+  font-size: 11px; font-weight: 700; color: #fff; background: var(--accent);
+  min-width: 20px; height: 20px; border-radius: 10px; display: grid; place-items: center; padding: 0 6px;
+}
+.nt.revoke .content { color: var(--danger); font-style: italic; }
+
+/* 重播机制：.replay 触发入场动画 */
+.replay .anim { animation-play-state: running; }
+.stage .anim { animation-fill-mode: both; }
+
+/* ============ A · 潮汐 Tidal —— 液态玻璃 ============ */
+.nt-tidal {
+  position: relative; padding: 16px 18px; border-radius: 22px;
+  background: linear-gradient(120deg, color-mix(in srgb, var(--card) 52%, transparent), color-mix(in srgb, var(--card) 30%, transparent));
+  backdrop-filter: blur(22px) saturate(1.5);
+  box-shadow: 0 12px 40px rgba(10,25,22,.22), inset 0 0 0 1px color-mix(in srgb, #fff 55%, transparent);
+  overflow: hidden;
+}
+html[data-theme="dark"] .nt-tidal { box-shadow: 0 12px 40px rgba(0,0,0,.5), inset 0 0 0 1px color-mix(in srgb, #fff 16%, transparent); }
+.nt-tidal::before {
+  content: ''; position: absolute; inset: -60%;
+  background: conic-gradient(from 0deg, transparent, color-mix(in srgb, var(--accent) 30%, transparent), transparent 30%, transparent 55%, color-mix(in srgb, var(--accent-2) 22%, transparent), transparent 75%);
+  animation: tidal-drift 9s linear infinite;
+  filter: blur(26px); opacity: .8;
+}
+@keyframes tidal-drift { to { transform: rotate(360deg); } }
+.nt-tidal::after {
+  content: ''; position: absolute; inset: 0; border-radius: 22px;
+  background: linear-gradient(120deg, rgba(255,255,255,.34), rgba(255,255,255,.05) 38%, transparent 60%);
+  pointer-events: none;
+}
+.nt-tidal > * { position: relative; z-index: 1; }
+.nt-tidal .edge { position: absolute; left: 0; top: 16%; bottom: 16%; width: 3.5px; border-radius: 4px;
+  background: linear-gradient(var(--accent), color-mix(in srgb, var(--accent) 40%, #fff)); }
+.replay .nt-tidal.anim { animation: tidal-in .7s cubic-bezier(.16,1,.3,1) both; }
+@keyframes tidal-in { from { opacity: 0; transform: translateY(18px) scale(.94); filter: blur(14px); } to { opacity: 1; filter: blur(0); } }
+
+/* ============ B · 终端 Terminal ============ */
+.nt-term {
+  width: 460px; background: #0c1110; color: #cfe3da; border-radius: 10px;
+  border: 1px solid #1d2a26; box-shadow: 0 10px 30px rgba(0,0,0,.4), inset 0 0 22px rgba(0,255,200,.03);
+  font-family: 'Cascadia Mono', Consolas, 'Courier New', monospace; font-size: 12.5px;
+  padding: 10px 14px 12px; position: relative; overflow: hidden;
+}
+.nt-term::after {
+  content: ''; position: absolute; left: 0; right: 0; top: 0; height: 42px;
+  background: linear-gradient(rgba(120,255,214,.07), transparent);
+  animation: term-scan 3.2s linear infinite; pointer-events: none;
+}
+@keyframes term-scan { from { transform: translateY(-46px); } to { transform: translateY(340px); } }
+.nt-term .bar { display: flex; gap: 6px; margin-bottom: 8px; }
+.nt-term .bar i { width: 9px; height: 9px; border-radius: 50%; background: #22332e; }
+.nt-term .bar i:first-child { background: #ff5f56; } .nt-term .bar i:nth-child(2) { background: #ffbd2e; } .nt-term .bar i:nth-child(3) { background: #27c93f; }
+.nt-term .ln { display: flex; gap: 8px; padding: 3px 0; white-space: nowrap; }
+.nt-term .ln .ts { color: #5d7a70; }
+.nt-term .ln .who { color: #7ce8c8; font-weight: 700; }
+.nt-term .ln .msg { color: #cfe3da; overflow: hidden; text-overflow: ellipsis; }
+.nt-term .ln.old { opacity: .45; }
+.nt-term .cursor { display: inline-block; width: 7px; height: 13px; background: #7ce8c8; vertical-align: -2px; animation: term-blink 1s steps(1) infinite; }
+@keyframes term-blink { 50% { opacity: 0; } }
+.replay .nt-term.anim .ln.top { overflow: hidden; animation: term-type .9s steps(32) both; }
+@keyframes term-type { from { max-width: 0; } to { max-width: 100%; } }
+
+/* ============ C · 信笺 Letterpress ============ */
+.nt-mail {
+  position: relative; width: 430px; padding: 20px 22px 14px; border-radius: 4px;
+  background:
+    repeating-linear-gradient(0deg, rgba(0,0,0,.012) 0 1px, transparent 1px 3px),
+    linear-gradient(175deg, #fbf8ef, #f4eedd);
+  color: #33302a; font-family: Georgia, 'Times New Roman', 'Source Han Serif SC', 'Noto Serif SC', serif;
+  box-shadow: 0 1px 0 rgba(255,255,255,.8) inset, 0 14px 34px rgba(60,50,20,.25);
+  border: 1px solid #d8cfae; outline: 1px solid rgba(120,105,60,.25); outline-offset: -5px;
+}
+html[data-theme="dark"] .nt-mail {
+  background: repeating-linear-gradient(0deg, rgba(255,255,255,.015) 0 1px, transparent 1px 3px), linear-gradient(175deg, #22201a, #191813);
+  color: #e8e2d0; border-color: #3a372c; outline-color: rgba(200,180,120,.3);
+  box-shadow: 0 14px 34px rgba(0,0,0,.5);
+}
+.nt-mail .r1 .name { font-style: italic; font-size: 15px; }
+.nt-mail .content { white-space: normal; font-size: 13.5px; line-height: 1.65; margin-top: 8px; }
+.nt-mail .stamp {
+  position: absolute; top: 10px; right: 14px; width: 58px; height: 58px; border: 1.5px dashed currentColor;
+  border-radius: 50%; display: grid; place-items: center; text-align: center;
+  font-size: 9.5px; line-height: 1.25; transform: rotate(-9deg); opacity: .55; font-family: inherit;
+}
+html[data-theme="dark"] .nt-mail .stamp { color: #d8b96a; }
+html[data-theme="light"] .nt-mail .stamp { color: #8a7440; }
+.nt-mail .foot { margin-top: 12px; padding-top: 8px; border-top: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+  font-size: 10px; letter-spacing: 2px; opacity: .6; text-align: right; }
+.nt-mail.revoke::after {
+  content: '已 撤 回'; position: absolute; inset: 0; display: grid; place-items: center;
+  font-size: 30px; letter-spacing: 14px; color: var(--danger); opacity: .55;
+  transform: rotate(-14deg); font-weight: 700;
+}
+.replay .nt-mail.anim { animation: mail-in .8s cubic-bezier(.2,.9,.25,1) both; transform-origin: top center; }
+@keyframes mail-in { from { opacity: 0; transform: translateY(-26px) rotate(-2.5deg); } 60% { transform: translateY(3px) rotate(.5deg); } to { opacity: 1; } }
+
+/* ============ D · 霓虹 Neon Arc ============ */
+.nt-neon {
+  position: relative; width: 420px; padding: 17px 18px; border-radius: 14px;
+  background: linear-gradient(140deg, #0b0b16, #12101f);
+  color: #d9d6f2; overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(140,120,255,.35), 0 0 26px rgba(120,110,255,.28), 0 18px 44px rgba(0,0,0,.55);
+}
+.nt-neon::before {
+  content: ''; position: absolute; left: -38px; top: -38px; width: 150px; height: 150px; border-radius: 50%;
+  background: conic-gradient(from 200deg, transparent, #7c6cff 12%, #38e8ff 22%, transparent 34%);
+  animation: neon-orbit 4.5s linear infinite; filter: blur(9px); opacity: .85;
+}
+@keyframes neon-orbit { to { transform: rotate(360deg); } }
+.nt-neon::after { content: ''; position: absolute; inset: 0; border-radius: 14px;
+  background: radial-gradient(90px 60px at 12% 0%, rgba(124,108,255,.16), transparent 70%); pointer-events: none; }
+.nt-neon > * { position: relative; z-index: 1; }
+.nt-neon .avatar { box-shadow: 0 0 14px rgba(124,108,255,.8); }
+.nt-neon .name { color: #b9b0ff; text-shadow: 0 0 12px rgba(124,108,255,.7); }
+.nt-neon .content { color: #9fd8e8; text-shadow: 0 0 10px rgba(56,232,255,.35); }
+.nt-neon .time { color: #6a679c; }
+html[data-theme="light"] .nt-neon { background: linear-gradient(140deg, #f0eefe, #e7e6fb); color: #2c2a4a;
+  box-shadow: 0 0 0 1px rgba(124,108,255,.4), 0 0 22px rgba(124,108,255,.18), 0 14px 34px rgba(80,70,180,.2); }
+html[data-theme="light"] .nt-neon .name { color: #5a48d8; text-shadow: none; }
+html[data-theme="light"] .nt-neon .content { color: #206a80; text-shadow: none; }
+.replay .nt-neon.anim { animation: neon-in .65s cubic-bezier(.2,.9,.3,1.1) both; }
+@keyframes neon-in { from { opacity: 0; transform: translateX(-22px); box-shadow: 0 0 0 rgba(124,108,255,0); } to { opacity: 1; transform: none; } }
+
+/* ============ E · 音轨 Waveform ============ */
+.nt-wave {
+  width: 400px; padding: 14px 16px; border-radius: 16px; background: var(--card);
+  border: 1px solid var(--line); box-shadow: 0 12px 30px rgba(10,25,22,.16);
+  align-items: stretch;
+}
+.nt-wave .eq { flex: 0 0 46px; display: flex; align-items: flex-end; gap: 3px; padding-right: 4px; }
+.nt-wave .eq i { flex: 1; border-radius: 3px 3px 1px 1px; background: linear-gradient(var(--accent-2), var(--accent)); min-height: 4px; transform-origin: bottom; }
+.replay .nt-wave.anim .eq i { animation: eq-bounce 1.4s ease-in-out infinite; }
+.replay .nt-wave.anim .eq i:nth-child(2n) { animation-duration: 1.1s; }
+.replay .nt-wave.anim .eq i:nth-child(3n) { animation-duration: 1.7s; animation-delay: .12s; }
+@keyframes eq-bounce { 0%,100% { height: 14%; } 50% { height: 96%; } }
+.nt-wave .r1 .name { color: var(--ink); }
+.nt-wave .content { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.nt-wave .lvl { font-size: 10px; letter-spacing: 1px; color: var(--ink-3); margin-top: 5px; }
+.replay .nt-wave.anim { animation: wave-in .55s cubic-bezier(.2,1.2,.3,1) both; }
+@keyframes wave-in { from { opacity: 0; transform: scale(.9); } to { opacity: 1; } }
+
+/* ============ F · 蜂巢 Hexcell ============ */
+.hex-field { display: flex; gap: 10px; align-items: center; }
+.hex {
+  width: 108px; height: 120px; clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  background: var(--card); position: relative; margin: 6px 1px;
+  box-shadow: 0 10px 24px rgba(10,25,22,.2); transition: transform .25s;
+}
+.hex::before { content: ''; position: absolute; inset: 2px; clip-path: inherit;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--c, var(--accent)) 82%, #fff), var(--c, var(--accent))); }
+.hex > * { position: relative; z-index: 1; color: #fff; }
+.hex .av { width: 34px; height: 34px; border-radius: 50%; background: rgba(255,255,255,.22);
+  display: grid; place-items: center; font-weight: 700; font-size: 15px; }
+.hex .hn { font-size: 11px; font-weight: 700; max-width: 84px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hex .hc { font-size: 10px; opacity: .85; }
+.hex .count { position: absolute; top: 16px; right: 16px; z-index: 2; min-width: 19px; height: 19px; border-radius: 10px;
+  background: #fff; color: var(--c, var(--accent)); font-size: 10.5px; font-weight: 800; display: grid; place-items: center; padding: 0 5px; }
+.hex.ghost::before { background: color-mix(in srgb, var(--card) 80%, var(--line)); }
+.hex.ghost { box-shadow: none; }
+.hex.ghost .plus { color: var(--ink-3); font-size: 20px; font-weight: 300; }
+.hex:hover { transform: translateY(-4px) scale(1.04); }
+.replay .hex.anim { animation: hex-in .6s cubic-bezier(.2,1.1,.3,1) both; }
+.replay .hex.anim:nth-child(2) { animation-delay: .1s; }
+.replay .hex.anim:nth-child(3) { animation-delay: .2s; }
+.replay .hex.anim:nth-child(4) { animation-delay: .3s; }
+.replay .hex.anim:nth-child(5) { animation-delay: .38s; }
+@keyframes hex-in { from { opacity: 0; transform: scale(.4) rotate(-8deg); } to { opacity: 1; } }
+
+/* ============ G · 卷轴 Scroll —— 热敏纸带 ============ */
+.nt-scroll {
+  width: 330px; background: linear-gradient(#fdfcf7, #f6f3e8); color: #3c3a33;
+  border-radius: 2px; padding: 12px 18px 14px;
+  box-shadow: 0 16px 40px rgba(40,35,15,.3);
+  font-family: 'Cascadia Mono', Consolas, monospace; font-size: 12px;
+  position: relative;
+}
+html[data-theme="dark"] .nt-scroll { background: linear-gradient(#1b1d18, #141611); color: #cfcbb8;
+  box-shadow: 0 16px 40px rgba(0,0,0,.55); }
+.nt-scroll::before, .nt-scroll::after {
+  content: ''; position: absolute; left: 0; right: 0; height: 7px;
+  background: linear-gradient(90deg, currentColor 2px, transparent 2px) 0 0/7px 4px repeat-x; opacity: .18;
+}
+.nt-scroll::before { top: -1px; } .nt-scroll::after { bottom: -1px; }
+.nt-scroll .shead { display: flex; justify-content: space-between; font-size: 10.5px; letter-spacing: 1px;
+  border-bottom: 1px dashed color-mix(in srgb, currentColor 34%, transparent); padding-bottom: 6px; margin-bottom: 6px; opacity: .75; }
+.nt-scroll .item { display: flex; gap: 8px; padding: 5px 0; border-bottom: 1px dashed color-mix(in srgb, currentColor 18%, transparent); }
+.nt-scroll .item:last-child { border-bottom: 0; }
+.nt-scroll .item .t { color: #8a8672; flex: 0 0 auto; }
+html[data-theme="dark"] .nt-scroll .item .t { color: #77745f; }
+.nt-scroll .item .who { font-weight: 700; }
+.nt-scroll .item .c { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nt-scroll .item.hot .who { color: var(--accent); }
+html[data-theme="dark"] .nt-scroll .item.hot .who { color: var(--accent-2); }
+.replay .nt-scroll.anim { animation: scroll-print .9s cubic-bezier(.2,.8,.2,1) both; transform-origin: top center; }
+@keyframes scroll-print { from { opacity: 0; clip-path: inset(0 0 100% 0); } to { opacity: 1; clip-path: inset(0 0 -8% 0); } }
+
+/* ============ H · 呼吸圆环 Halo ============ */
+.nt-halo { width: 400px; gap: 15px; padding: 12px 14px; border-radius: 18px;
+  background: var(--card); border: 1px solid var(--line); box-shadow: 0 12px 30px rgba(10,25,22,.15); }
+.nt-halo .ring {
+  --p: 78; flex: 0 0 58px; width: 58px; height: 58px; border-radius: 50%; position: relative;
+  background: conic-gradient(var(--accent) calc(var(--p) * 1%), color-mix(in srgb, var(--ink-3) 30%, transparent) 0);
+  display: grid; place-items: center;
+}
+.nt-halo .ring::before { content: ''; position: absolute; inset: 4px; border-radius: 50%; background: var(--card); }
+.nt-halo .ring .avatar { width: 42px; height: 42px; font-size: 16px; color: #fff;
+  position: relative; z-index: 1; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
+.nt-halo .r1 .name { font-size: 14px; }
+.nt-halo .content { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.nt-halo .ttl { font-size: 10.5px; color: var(--ink-3); margin-top: 4px; display: flex; gap: 6px; align-items: center; }
+.nt-halo .ttl i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: halo-pulse 1.2s ease-in-out infinite; }
+@keyframes halo-pulse { 50% { opacity: .25; transform: scale(.7); } }
+.replay .nt-halo.anim { animation: wave-in .5s cubic-bezier(.2,1.1,.3,1) both; }
+
+/* ============ I · 灵动胶囊 Capsule —— Dynamic Island ============ */
+/* 形态：深色玻璃胶囊（全圆角）。出现：壳体由中间向两边展开（scaleX 中心锚定 + 轻微过冲），内容延后浮现；
+   消失：内容先行隐去，壳体由两边向中间收拢至一点。循环演示自动重复全流程便于观察。 */
+.nt-capsule {
+  position: relative; width: 430px; height: 58px; border-radius: 999px;
+  display: flex; align-items: center; gap: 12px; padding: 0 18px 0 12px;
+  background: linear-gradient(180deg, rgba(28,32,34,.96), rgba(12,14,16,.96));
+  border: 1px solid rgba(255,255,255,.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.09),
+    0 0 0 1px rgba(0,0,0,.25),
+    0 16px 44px rgba(0,0,0,.45),
+    0 0 30px color-mix(in srgb, var(--accent) 22%, transparent);
+  backdrop-filter: blur(18px);
+  color: #eef2f1;
+  transform-origin: center center;
+}
+html[data-theme="dark"] .nt-capsule {
+  background: linear-gradient(180deg, rgba(38,44,46,.96), rgba(18,21,22,.96));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.1),
+    0 0 0 1px rgba(0,0,0,.4),
+    0 16px 44px rgba(0,0,0,.55),
+    0 0 34px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.nt-capsule .avatar { flex: 0 0 36px; width: 36px; height: 36px; font-size: 14px;
+  box-shadow: 0 0 0 2px rgba(255,255,255,.14); }
+.nt-capsule .r1 { gap: 7px; }
+.nt-capsule .name { color: #fff; font-size: 13px; }
+.nt-capsule .grp { color: #9fb0ab; }
+.nt-capsule .content { color: #b9c6c1; margin-top: 1px; }
+.nt-capsule .time { color: #778782; }
+.nt-capsule .badge { box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 60%, transparent); }
+.nt-capsule .live { flex: 0 0 auto; display: flex; align-items: flex-end; gap: 2.5px; height: 14px; }
+.nt-capsule .live i { width: 3px; border-radius: 2px; background: var(--accent-2); height: 40%;
+  animation: capsule-live 1.1s ease-in-out infinite; }
+.nt-capsule .live i:nth-child(2) { animation-delay: .18s; }
+.nt-capsule .live i:nth-child(3) { animation-delay: .36s; }
+@keyframes capsule-live { 0%, 100% { height: 30%; } 50% { height: 100%; } }
+
+/* —— 循环形变演示：出现（中间→两边）→ 停留 → 消失（两边→中间）—— */
+.capsule-cycle { animation: capsule-cycle 7s cubic-bezier(.32,1.18,.35,1) infinite; }
+@keyframes capsule-cycle {
+  0%   { transform: scaleX(.04) scaleY(.6); opacity: 0; }
+  9%   { opacity: 1; }
+  17%  { transform: scaleX(1.035) scaleY(1.03); }
+  23%  { transform: scaleX(1) scaleY(1); }
+  80%  { transform: scaleX(1) scaleY(1); opacity: 1; }
+  87%  { transform: scaleX(1.02) scaleY(1.015); opacity: 1; }
+  100% { transform: scaleX(.04) scaleY(.6); opacity: 0; }
+}
+.capsule-cycle .capsule-inner { animation: capsule-inner-cycle 7s cubic-bezier(.3,.9,.3,1) infinite; }
+@keyframes capsule-inner-cycle {
+  0%, 13%  { opacity: 0; transform: translateY(5px); }
+  26%, 82% { opacity: 1; transform: none; }
+  93%, 100% { opacity: 0; transform: translateY(4px); }
+}
+/* —— 静态完整态（单条 / 合并）—— */
+.replay .nt-capsule.anim { animation: capsule-in .62s cubic-bezier(.32,1.28,.35,1) both; }
+@keyframes capsule-in {
+  0% { transform: scaleX(.06) scaleY(.62); opacity: 0; }
+  62% { transform: scaleX(1.03) scaleY(1.02); opacity: 1; }
+  100% { transform: scaleX(1) scaleY(1); opacity: 1; }
+}
+.replay .nt-capsule.anim .capsule-inner { animation: capsule-content .45s ease .2s both; }
+@keyframes capsule-content { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+/* 退场（供落地参考）：内容 120ms 隐去 → 壳体 240ms 向中间收拢 */
+.capsule-out-demo { animation: capsule-out .52s cubic-bezier(.5,0,.75,.4) infinite alternate; }
+@keyframes capsule-out {
+  0%, 42% { transform: scaleX(1) scaleY(1); opacity: 1; }
+  60% { transform: scaleX(1) scaleY(1); opacity: 1; }
+  100% { transform: scaleX(.04) scaleY(.6); opacity: 0; }
+}
+.capsule-out-demo .capsule-inner { animation: capsule-inner-out .52s ease infinite alternate; }
+@keyframes capsule-inner-out {
+  0%, 30% { opacity: 1; transform: none; }
+  48%, 100% { opacity: 0; transform: translateY(4px); }
+}
+.nt-capsule, .nt-capsule .capsule-inner { will-change: transform, opacity; }
+@media (prefers-reduced-motion: reduce) {
+  .capsule-cycle, .capsule-cycle .capsule-inner, .capsule-out-demo, .capsule-out-demo .capsule-inner { animation: none; }
+  .nt-capsule { transform: none; }
+}
+
+/* ---------- 页脚说明 ---------- */
+footer { text-align: center; font-size: 12px; color: var(--ink-3); padding: 0 24px 50px; line-height: 1.8; }
+</style>
+</head>
+<body class="replay">
+
+<div class="hud">
+  <div>
+    <h1>PingNest · 通知样式 2026 重设计提案</h1>
+    <div class="sub">9 组方向性方案 · 全部为全新设计语言，非旧样式迭代 · 可任选或全选 · 选定后旧五套整体移除</div>
+  </div>
+  <div class="spacer"></div>
+  <button id="btn-light" class="on">浅色桌面</button>
+  <button id="btn-dark">深色桌面</button>
+  <button id="btn-replay">↻ 重播入场动画</button>
+</div>
+
+<main>
+
+  <!-- ================= A · 潮汐 ================= -->
+  <section class="stage" id="s-tidal">
+    <div class="stage-head"><span class="tag">A</span><h2>潮汐</h2><span class="en">Tidal · Liquid Glass</span></div>
+    <p class="stage-desc">液态玻璃材质：高斯模糊磨砂 + 缓慢旋转的<b>流光渐变</b>从卡片背后掠过，左侧强调色「水线」标识会话。内容像从水面下浮起——入场从模糊到清晰。适合追求<b>现代质感</b>、愿意让通知有一点点存在感的用户。</p>
+    <div class="stage-canvas">
+      <div class="nt nt-tidal anim">
+        <span class="edge"></span>
+        <div class="avatar">张</div>
+        <div class="body">
+          <div class="r1"><span class="name">张三</span><span class="grp">产品设计群</span><span class="time">20:45</span></div>
+          <div class="content">今晚 8 点前把方案发我，我们需要做最后评审</div>
+        </div>
+        <span class="badge">3</span>
+      </div>
+      <div class="nt nt-tidal anim revoke">
+        <span class="edge" style="background: var(--danger);"></span>
+        <div class="avatar" style="background: linear-gradient(135deg, #b35a5a, #7a3a3a);">李</div>
+        <div class="body">
+          <div class="r1"><span class="name">李四</span><span class="time">20:44</span></div>
+          <div class="content">对方撤回了一条消息，内容为「明天再聊」</div>
+        </div>
+      </div>
+      <span class="wall-hint">毛玻璃 + 流光 · 点击/倒计时同当前交互</span>
+    </div>
+  </section>
+
+  <!-- ================= B · 终端 ================= -->
+  <section class="stage" id="s-term">
+    <div class="stage-head"><span class="tag">B</span><h2>终端</h2><span class="en">Terminal · Log Line</span></div>
+    <p class="stage-desc">把通知降格为一条<b>系统日志</b>：等宽字体、时间戳、单行流水。多会话 = 多行 log，最新一行打字机式键入并带闪烁光标，旧行自动降透明度。占用极小、极度安静，适合<b>挂机监控、不想被打断</b>的极客用户。这是全场信息密度最低、最不像"通知"的方案。</p>
+    <div class="stage-canvas">
+      <div class="nt-term anim">
+        <div class="bar"><i></i><i></i><i></i></div>
+        <div class="ln old"><span class="ts">20:41</span><span class="who">产品群/王五</span><span class="msg">会议纪要已上传</span></div>
+        <div class="ln old"><span class="ts">20:44</span><span class="who">李四</span><span class="msg">撤回了一条消息</span></div>
+        <div class="ln top"><span class="ts">20:45</span><span class="who">张三</span><span class="msg">今晚 8 点前把方案发我，需要最后评审</span><span class="cursor"></span></div>
+      </div>
+      <span class="wall-hint">typewriter 键入 + 扫描线 + 光标闪烁</span>
+    </div>
+  </section>
+
+  <!-- ================= C · 信笺 ================= -->
+  <section class="stage" id="s-mail">
+    <div class="stage-head"><span class="tag">C</span><h2>信笺</h2><span class="en">Letterpress · A Letter</span></div>
+    <p class="stage-desc">把每条消息当作<b>一封拆开的信</b>：纸纹底、双线钢印边框、衬线字体、右上角旋转的圆形<b>时间邮戳</b>，页脚一行"DELIVERED BY PINGNEST"。撤回的消息以斜盖红章呈现。深情、慢节奏、有仪式感——通知不再是"弹窗"，而是"收信"。深色模式是深夜蓝纸配烫金。</p>
+    <div class="stage-canvas">
+      <div class="nt-mail anim">
+        <div class="stamp">PINGNEST<br>20:45<br>· 今日 ·</div>
+        <div class="nt" style="width:auto;">
+          <div class="avatar" style="background: linear-gradient(135deg, #8a7440, #5d4d2a); font-family: serif;">张</div>
+          <div class="body">
+            <div class="r1"><span class="name">张三</span><span class="time">· 亲启 ·</span></div>
+          </div>
+        </div>
+        <div class="content">今晚 8 点前把方案发我，我们需要做最后一轮评审。辛苦了，细节可以明天再过。</div>
+        <div class="foot">DELIVERED BY PINGNEST</div>
+      </div>
+      <div class="nt-mail anim revoke" style="margin-top: 8px;">
+        <div class="stamp">PINGNEST<br>20:44<br>· 今日 ·</div>
+        <div class="nt" style="width:auto;">
+          <div class="avatar" style="background: linear-gradient(135deg, #7a6a8a, #4a3f5a); font-family: serif;">李</div>
+          <div class="body"><div class="r1"><span class="name">李四</span><span class="time">· 亲启 ·</span></div></div>
+        </div>
+        <div class="content">此信已被寄件人撤回，内容为「明天再聊」。</div>
+        <div class="foot">DELIVERED BY PINGNEST</div>
+      </div>
+      <span class="wall-hint">抽信入场 + 邮戳 + 撤回红章</span>
+    </div>
+  </section>
+
+  <!-- ================= D · 霓虹 ================= -->
+  <section class="stage" id="s-neon">
+    <div class="stage-head"><span class="tag">D</span><h2>霓虹弧光</h2><span class="en">Neon Arc · Cyber</span></div>
+    <p class="stage-desc">深空底色上，一道<b>旋转的霓虹弧光</b>沿卡片左上角环绕——强调色即消息的"能量色"；文字带辉光，头像悬浮发光。入场时从左侧滑入并点亮光晕。全场个性最强、科技感拉满的方案，适合把通知当成<b>桌面赛博装饰</b>的用户。浅色模式自动降级为淡紫描边。</p>
+    <div class="stage-canvas">
+      <div class="nt nt-neon anim">
+        <div class="avatar">张</div>
+        <div class="body">
+          <div class="r1"><span class="name">张三</span><span class="grp">产品设计群</span><span class="time">20:45</span></div>
+          <div class="content">今晚 8 点前把方案发我，我们需要做最后评审</div>
+        </div>
+        <span class="badge">3</span>
+      </div>
+      <span class="wall-hint">旋转弧光 + 文字辉光 + 滑入点亮</span>
+    </div>
+  </section>
+
+  <!-- ================= E · 音轨 ================= -->
+  <section class="stage" id="s-wave">
+    <div class="stage-head"><span class="tag">E</span><h2>音轨</h2><span class="en">Waveform · Signal</span></div>
+    <p class="stage-desc">通知是一段<b>正在播放的信号</b>：左侧一组跳动的频谱柱，合并的消息越多振幅越大、柱列越"激动"，停留时间将尽时整列自然衰减归零。文字信息压缩到两行。用<b>听觉隐喻</b>表达"谁在说话、说了多少"，安静但信息可感知。</p>
+    <div class="stage-canvas">
+      <div class="nt nt-wave anim">
+        <div class="eq"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="body">
+          <div class="r1"><span class="name">张三</span><span class="grp">产品设计群</span><span class="time">20:45</span></div>
+          <div class="content">今晚 8 点前把方案发我，我们需要做最后一轮评审，别忘了带上测试报告</div>
+          <div class="lvl">SIGNAL · 3 MSGS · STRONG</div>
+        </div>
+        <span class="badge">3</span>
+      </div>
+      <span class="wall-hint">频谱弹跳 + 停留衰减包络</span>
+    </div>
+  </section>
+
+  <!-- ================= F · 蜂巢 ================= -->
+  <section class="stage" id="s-hex">
+    <div class="stage-head"><span class="tag">F</span><h2>蜂巢</h2><span class="en">Hexcell · Swarm</span></div>
+    <p class="stage-desc">抛弃矩形卡片：每条通知是一只<b>六边形蜂室</b>，会话即蜂群。多会话时自动在屏幕角落拼成蜂窝（超出缩为"+"幽灵格），悬停单格展开消息内容。用<b>空间拼合</b>表达"有几路会话在说话"——形态本身即信息。落地成本最高（需要新的布局系统），但形态独一无二。</p>
+    <div class="stage-canvas">
+      <div class="hex-field">
+        <div class="hex anim" style="--c:#006a6a;"><span class="av">张</span><span class="hn">张三</span><span class="hc">今晚 8 点前把方案…</span><span class="count">3</span></div>
+        <div class="hex anim" style="--c:#8a5a2a;"><span class="av">李</span><span class="hn">李四</span><span class="hc">撤回了一条消息</span></div>
+        <div class="hex anim" style="--c:#5a4a8a;"><span class="av">群</span><span class="hn">产品设计群</span><span class="hc">王五: 会议纪要已…</span><span class="count">9</span></div>
+        <div class="hex anim ghost"><span class="plus">+2</span></div>
+      </div>
+      <span class="wall-hint">蜂窝拼合 + 悬停展开 + 幽灵格溢出</span>
+    </div>
+  </section>
+
+  <!-- ================= G · 卷轴 ================= -->
+  <section class="stage" id="s-scroll">
+    <div class="stage-head"><span class="tag">G</span><h2>卷轴</h2><span class="en">Thermal Scroll · Receipt</span></div>
+    <p class="stage-desc">通知不是一张卡，而是一条从屏幕边缘<b>打印出来的热敏纸带</b>：每条新消息"打印"一行，自动向下增长、裁掉最旧，锯齿纸边、虚线分隔、等宽字。一屏之内同时看清<b>最近发生了什么</b>——适合离开片刻回来扫一眼的场景。深色模式为碳复写纸质感。</p>
+    <div class="stage-canvas">
+      <div class="nt-scroll anim">
+        <div class="shead"><span>PINGNEST · 接收流水</span><span>NO.0829</span></div>
+        <div class="item"><span class="t">20:41</span><span class="who">产品群/王五</span><span class="c">会议纪要已上传，请查收</span></div>
+        <div class="item"><span class="t">20:44</span><span class="who">李四</span><span class="c">撤回了一条消息</span></div>
+        <div class="item hot"><span class="t">20:45</span><span class="who">张三</span><span class="c">今晚 8 点前把方案发我 ▸▸</span></div>
+      </div>
+      <span class="wall-hint">打印滚动 + 锯齿纸边 + 最新行高亮</span>
+    </div>
+  </section>
+
+  <!-- ================= H · 圆环 ================= -->
+  <section class="stage" id="s-halo">
+    <div class="stage-head"><span class="tag">H</span><h2>呼吸圆环</h2><span class="en">Halo · Countdown Ring</span></div>
+    <p class="stage-desc">把"还剩多久消失"变成视觉主体：<b>头像嵌在倒计时圆环中心</b>，环随停留时间从满环走到空环，最后四分之一转为警示色并脉冲提醒；正文两行收在环侧。极简、安静、时间感知极强——适合"不想错过时效"的人。</p>
+    <div class="stage-canvas">
+      <div class="nt nt-halo anim">
+        <div class="ring"><div class="avatar">张</div></div>
+        <div class="body">
+          <div class="r1"><span class="name">张三</span><span class="grp">产品设计群</span><span class="time">20:45</span></div>
+          <div class="content">今晚 8 点前把方案发我，我们需要做最后评审</div>
+          <div class="ttl"><i></i>剩余 3 秒 · 点击直达会话</div>
+        </div>
+      </div>
+      <div class="nt nt-halo anim" style="--p: 18;">
+        <div class="ring" style="--p: 18; background: conic-gradient(var(--danger) calc(var(--p) * 1%), color-mix(in srgb, var(--ink-3) 30%, transparent) 0);"><div class="avatar" style="background: linear-gradient(135deg, #b35a5a, #7a3a3a);">李</div></div>
+        <div class="body">
+          <div class="r1"><span class="name">李四</span><span class="time">20:44</span></div>
+          <div class="content">撤回了一条消息，内容为「明天再聊」</div>
+          <div class="ttl" style="color: var(--danger);"><i style="background: var(--danger);"></i>即将消失</div>
+        </div>
+      </div>
+      <span class="wall-hint">conic 倒计时环 + 临期脉冲</span>
+    </div>
+  </section>
+  <!-- ================= I · 灵动胶囊 ================= -->
+  <section class="stage" id="s-capsule">
+    <div class="stage-head"><span class="tag">I</span><h2>灵动胶囊</h2><span class="en">Capsule · Dynamic Island</span></div>
+    <p class="stage-desc">上一版灵动岛的重制：深色玻璃胶囊悬浮于任何桌面。出现时<b>壳体由中间向两边展开</b>（带轻微回弹过冲），内容在壳体成型后再浮现；消失时<b>内容先行隐去、壳体由两边向中间收拢至一点</b>。右端一枚微动"信号条"提示消息活性，合并数带辉光徽标。上方为自动循环的全流程形变演示，便于反复观察两个方向的动画。</p>
+    <div class="stage-canvas">
+      <!-- 循环形变演示：出现 → 停留 → 消失 -->
+      <div class="nt-capsule capsule-cycle" style="width: 300px;">
+        <div class="capsule-inner" style="display: flex; align-items: center; gap: 12px; width: 100%; padding: 0 18px 0 12px;">
+          <div class="avatar">张</div>
+          <div class="body" style="flex: 1; min-width: 0;">
+            <div class="r1"><span class="name">张三</span><span class="grp">产品设计群</span></div>
+          </div>
+          <span class="badge">3</span>
+          <span class="live"><i></i><i></i><i></i></span>
+        </div>
+      </div>
+      <!-- 退场方向单独演示（内容先隐 → 壳向中间收拢，循环交替） -->
+      <div class="nt-capsule capsule-out-demo" style="width: 300px;">
+        <div class="capsule-inner" style="display: flex; align-items: center; gap: 12px; width: 100%; padding: 0 18px 0 12px;">
+          <div class="avatar" style="background: linear-gradient(135deg, #b35a5a, #7a3a3a);">李</div>
+          <div class="body" style="flex: 1; min-width: 0;">
+            <div class="r1"><span class="name">李四</span></div>
+          </div>
+        </div>
+      </div>
+      <!-- 静态完整态：单条与合并 -->
+      <div class="nt nt-capsule anim">
+        <div class="capsule-inner" style="display: flex; align-items: center; gap: 12px; width: 100%;">
+          <div class="avatar">张</div>
+          <div class="body" style="flex: 1; min-width: 0;">
+            <div class="r1"><span class="name">张三</span><span class="grp">产品设计群</span><span class="time">20:45</span></div>
+            <div class="content">今晚 8 点前把方案发我，我们需要做最后评审</div>
+          </div>
+          <span class="live"><i></i><i></i><i></i></span>
+        </div>
+      </div>
+      <div class="nt nt-capsule anim" style="margin-top: -6px;">
+        <div class="capsule-inner" style="display: flex; align-items: center; gap: 12px; width: 100%;">
+          <div class="avatar" style="background: linear-gradient(135deg, #8a5a2a, #5d3d1a);">王</div>
+          <div class="body" style="flex: 1; min-width: 0;">
+            <div class="r1"><span class="name">产品群 / 王五</span><span class="time">20:41</span></div>
+            <div class="content">会议纪要已上传，请查收</div>
+          </div>
+          <span class="badge">9</span>
+        </div>
+      </div>
+      <span class="wall-hint">上：出现/消失 循环形变 · 中：退场方向单独演示 · 下：静态完整态与合并态</span>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  每个方案都可独立适配：位置五向 · 同会话合并 · 撤回事件 · 堆叠队列 · 深浅主题 · reduced-motion。<br />
+  选定后：移除旧五套样式（standard / compact / layered / minimal / island），新样式接入 notificationMetrics 尺寸表与全部现有交互行为。
+</footer>
+
+<script>
+  // 主题切换
+  const root = document.documentElement
+  const btnLight = document.getElementById('btn-light')
+  const btnDark = document.getElementById('btn-dark')
+  function setTheme(t) {
+    if (t === 'dark') root.setAttribute('data-theme', 'dark'); else root.removeAttribute('data-theme')
+    btnLight.classList.toggle('on', t !== 'dark')
+    btnDark.classList.toggle('on', t === 'dark')
+    replay()
+  }
+  btnLight.onclick = () => setTheme('light')
+  btnDark.onclick = () => setTheme('dark')
+  // 重播入场动画：摘掉 replay 强制 reflow 再挂回
+  function replay() {
+    document.body.classList.remove('replay')
+    void document.body.offsetWidth
+    document.body.classList.add('replay')
+  }
+  document.getElementById('btn-replay').onclick = replay
+</script>
+</body>
+</html>
