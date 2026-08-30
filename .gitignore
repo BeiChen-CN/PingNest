@@ -8,3 +8,7 @@ logs/
 *.log
 .DS_Store
 .zcode/
+
+# 构建期生成物（npm install / npm run build 自动重建）
+resources/dll-manifest.json
+resources/licenses/
