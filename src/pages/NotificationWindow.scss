@@ -1,41 +1,60 @@
 @use '../styles/motion' as *;
 
-@keyframes notification-enter-top {
-  from { opacity: 0; transform: translate3d(0, -14px, 0) scale(.965); }
-  68% { opacity: .98; transform: translate3d(0, 1px, 0) scale(1.002); }
-  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+// 通知窗口动画：入场按样式分（与 public/notification-styles-2026.html 提案一致），
+// 退场默认按位置方向，五套样式（capsule/scroll/hex/halo/tidal）有专属退场。
+
+@keyframes notification-enter-tidal {
+  from { opacity: 0; transform: translateY(18px) scale(.94); filter: blur(14px); }
+  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
 }
 
-@keyframes notification-enter-bottom {
-  from { opacity: 0; transform: translate3d(0, 14px, 0) scale(.965); }
-  68% { opacity: .98; transform: translate3d(0, -1px, 0) scale(1.002); }
-  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+@keyframes notification-enter-terminal {
+  from { opacity: 0; transform: translateX(-16px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
-@keyframes notification-enter-left {
-  from { opacity: 0; transform: translate3d(-13px, -2px, 0) scale(.965); }
-  68% { opacity: .98; transform: translate3d(1px, 0, 0) scale(1.002); }
-  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+@keyframes notification-enter-mail {
+  0% { opacity: 0; transform: translateY(-26px) rotate(-2.5deg); }
+  60% { opacity: 1; transform: translateY(3px) rotate(.5deg); }
+  100% { opacity: 1; transform: translateY(0) rotate(0); }
 }
 
-@keyframes notification-enter-right {
-  from { opacity: 0; transform: translate3d(13px, -2px, 0) scale(.965); }
-  68% { opacity: .98; transform: translate3d(-1px, 0, 0) scale(1.002); }
-  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+@keyframes notification-enter-neon {
+  from { opacity: 0; transform: translateX(-22px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
-// 灵动胶囊（island）：出现从中心展开（带回弹），消失从两边向中心收起。
-@keyframes notification-island-enter {
-  0% { opacity: 0; transform: scale(.16, .55); }
-  55% { opacity: 1; transform: scale(1.04, 1.06); }
-  78% { transform: scale(.985, .99); }
-  100% { opacity: 1; transform: scale(1, 1); }
+@keyframes notification-enter-wave {
+  from { opacity: 0; transform: scale(.9); }
+  to { opacity: 1; transform: scale(1); }
 }
 
-@keyframes notification-island-exit {
-  0% { opacity: 1; transform: scale(1, 1); }
-  32% { opacity: .96; transform: scale(.88, .92); }
-  100% { opacity: 0; transform: scale(.04, .4); }
+@keyframes notification-enter-hex {
+  from { opacity: 0; transform: scale(.4) rotate(-8deg); }
+  to { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+@keyframes notification-enter-scroll {
+  from { opacity: 0; clip-path: inset(0 0 100% 0); }
+  to { opacity: 1; clip-path: inset(0 0 -8% 0); }
+}
+
+@keyframes notification-enter-halo {
+  from { opacity: 0; transform: scale(.88); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+// 灵动胶囊：壳体由中间向两边展开（中心锚定 + 回弹过冲），内容延后浮现
+@keyframes notification-enter-capsule {
+  0% { opacity: 0; transform: scaleX(.06) scaleY(.62); }
+  55% { opacity: 1; }
+  62% { transform: scaleX(1.03) scaleY(1.02); }
+  100% { opacity: 1; transform: scaleX(1) scaleY(1); }
+}
+
+@keyframes notification-capsule-content {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes notification-exit-top {
@@ -62,85 +81,115 @@
   to { opacity: 0; transform: translate3d(8px, 0, 0) scale(.975); }
 }
 
+// 专属退场：灵动胶囊（两边→中间收拢）、卷轴（打印回卷）、蜂巢（缩回巢孔）、圆环（收缩消隐）、潮汐（模糊沉没）
+@keyframes notification-exit-capsule {
+  0% { opacity: 1; transform: scaleX(1) scaleY(1); }
+  100% { opacity: 0; transform: scaleX(.04) scaleY(.6); }
+}
+
+@keyframes notification-capsule-content-out {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(4px); }
+}
+
+@keyframes notification-exit-scroll {
+  from { opacity: 1; clip-path: inset(0 0 -8% 0); }
+  to { opacity: 0; clip-path: inset(0 0 100% 0); }
+}
+
+@keyframes notification-exit-hex {
+  from { opacity: 1; transform: scale(1) rotate(0); }
+  to { opacity: 0; transform: scale(.3) rotate(6deg); }
+}
+
+@keyframes notification-exit-halo {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(.6); }
+}
+
+@keyframes notification-exit-tidal {
+  from { opacity: 1; transform: scale(1); filter: blur(0); }
+  to { opacity: 0; transform: scale(.96); filter: blur(10px); }
+}
+
 // 透明画布：通知窗口 transparent: true，页面任何不透明背景都会变成"白色画布"。
 // 用 html > body 提高优先级，避免与全局样式表因打包顺序竞级。
+// #app（React 根节点）一并透明，作双保险。
 html { background: transparent; }
 
 html > body {
   background: transparent;
   overflow: hidden;
   margin: 0;
-  padding: 0;
 }
 
-#notification-current {
-  animation-duration: 390ms;
-  animation-timing-function: cubic-bezier(.16, 1, .3, 1);
-  animation-fill-mode: both;
+#app { background: transparent; }
+
+.notification-card {
   will-change: transform, opacity;
+  &.is-active {
+    animation-duration: 380ms;
+    animation-timing-function: cubic-bezier(.16, 1, .3, 1);
+    animation-fill-mode: both;
+  }
+  &.is-exiting {
+    pointer-events: none;
+    animation-duration: 260ms;
+    animation-timing-function: cubic-bezier(.4, 0, 1, 1);
+    animation-fill-mode: both;
+    transform-origin: center center;
+    z-index: 0 !important;
+  }
 }
 
-#notification-prev {
-  animation-duration: 260ms;
-  animation-timing-function: cubic-bezier(.4, 0, 1, 1);
-  animation-fill-mode: both;
-  transform-origin: center top;
-  will-change: transform, opacity;
-  z-index: 0 !important;
+// ---------- 入场（按样式） ----------
+.notification-card.is-active.notification-style-tidal { animation-name: notification-enter-tidal; }
+.notification-card.is-active.notification-style-terminal { animation-name: notification-enter-terminal; }
+.notification-card.is-active.notification-style-mail { animation-name: notification-enter-mail; animation-duration: 620ms; }
+.notification-card.is-active.notification-style-neon { animation-name: notification-enter-neon; }
+.notification-card.is-active.notification-style-wave { animation-name: notification-enter-wave; }
+.notification-card.is-active.notification-style-hex { animation-name: notification-enter-hex; }
+.notification-card.is-active.notification-style-scroll { animation-name: notification-enter-scroll; animation-duration: 560ms; }
+.notification-card.is-active.notification-style-halo { animation-name: notification-enter-halo; }
+.notification-card.is-active.notification-style-capsule {
+  animation-name: notification-enter-capsule;
+  animation-duration: 620ms;
+  animation-timing-function: cubic-bezier(.32, 1.18, .35, 1);
+  transform-origin: center center;
+  .ns-content { animation: notification-capsule-content .45s ease .2s both; }
 }
 
-#notification-current.notification-position-top-right,
-#notification-current.notification-position-top-left,
-#notification-current.notification-position-top-center { animation-name: notification-enter-top; }
+// ---------- 退场：默认按位置方向 ----------
+.notification-card.is-exiting.notification-position-top-right,
+.notification-card.is-exiting.notification-position-top-left,
+.notification-card.is-exiting.notification-position-top-center { animation-name: notification-exit-top; }
 
-#notification-current.notification-position-bottom-right,
-#notification-current.notification-position-bottom-left { animation-name: notification-enter-bottom; }
+.notification-card.is-exiting.notification-position-bottom-right,
+.notification-card.is-exiting.notification-position-bottom-left { animation-name: notification-exit-bottom; }
 
-#notification-prev.notification-position-top-right,
-#notification-prev.notification-position-top-left,
-#notification-prev.notification-position-top-center { animation-name: notification-exit-top; }
+.notification-card.is-exiting.notification-position-top-left,
+.notification-card.is-exiting.notification-position-bottom-left { animation-name: notification-exit-left; }
 
-#notification-prev.notification-position-bottom-right,
-#notification-prev.notification-position-bottom-left { animation-name: notification-exit-bottom; }
+.notification-card.is-exiting.notification-position-top-right,
+.notification-card.is-exiting.notification-position-bottom-right { animation-name: notification-exit-right; }
 
-#notification-current.notification-position-top-left,
-#notification-current.notification-position-bottom-left { animation-name: notification-enter-left; }
+.notification-card.is-exiting.notification-position-bottom-right,
+.notification-card.is-exiting.notification-position-bottom-left { transform-origin: center bottom; }
 
-#notification-current.notification-position-top-right,
-#notification-current.notification-position-bottom-right { animation-name: notification-enter-right; }
-
-#notification-prev.notification-position-top-left,
-#notification-prev.notification-position-bottom-left { animation-name: notification-exit-left; }
-
-#notification-prev.notification-position-top-right,
-#notification-prev.notification-position-bottom-right { animation-name: notification-exit-right; }
-
-#notification-prev.notification-position-bottom-right,
-#notification-prev.notification-position-bottom-left { transform-origin: center bottom; }
-
-// ---------- 灵动胶囊样式动画 ----------
-// 放在位置规则之后：同优先级下按源顺序覆盖 animation-name，
-// 进/出场都以胶囊自身中心为原点，与位置无关。
-#notification-current.notification-style-island,
-#notification-prev.notification-style-island {
-  transform-origin: 50% 50%;
-}
-
-#notification-current.notification-style-island {
-  animation-name: notification-island-enter;
-  animation-duration: 440ms;
-  animation-timing-function: cubic-bezier(.3, .9, .35, 1);
-}
-
-// 收起必须在 260ms（NOTIFICATION_EXIT_MS，窗口关闭）内完成
-#notification-prev.notification-style-island {
-  animation-name: notification-island-exit;
-  animation-duration: 240ms;
-  animation-timing-function: cubic-bezier(.55, 0, .75, .35);
+// ---------- 退场：样式专属覆盖（放在位置规则之后，同优先级按源顺序生效） ----------
+.notification-card.is-exiting.notification-style-tidal { animation-name: notification-exit-tidal; }
+.notification-card.is-exiting.notification-style-scroll { animation-name: notification-exit-scroll; }
+.notification-card.is-exiting.notification-style-hex { animation-name: notification-exit-hex; }
+.notification-card.is-exiting.notification-style-halo { animation-name: notification-exit-halo; }
+.notification-card.is-exiting.notification-style-capsule {
+  animation-name: notification-exit-capsule;
+  transform-origin: center center;
+  .ns-content { animation: notification-capsule-content-out .12s ease both; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #notification-current, #notification-prev {
-    animation-duration: .01ms;
+  .notification-card {
+    animation-duration: .01ms !important;
+    .ns-content { animation: none !important; }
   }
 }

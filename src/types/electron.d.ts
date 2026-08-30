@@ -1,4 +1,4 @@
-import type { AppConfig, AppStatus, HookProgress, NotifyCenterEntry } from '../features/dashboard/types'
+import type { AppConfig, AppStatus, HookProgress, NotifyCenterEntry, NotifyCenterPatch } from '../features/dashboard/types'
 import type { NotificationData } from '../components/NotificationToast'
 
 export {}
@@ -34,7 +34,7 @@ declare global {
         markSessionRead: (sessionId: string) => Promise<{ success: boolean }>
         remove: (id: string) => Promise<{ success: boolean }>
         clear: () => Promise<{ success: boolean }>
-        onUpdate: (callback: (entries: NotifyCenterEntry[]) => void) => (() => void) | undefined
+        onUpdate: (callback: (patch: NotifyCenterPatch) => void) => (() => void) | undefined
       }
       onNavigateToSession: (callback: (sessionId: string) => void) => (() => void) | undefined
     }
