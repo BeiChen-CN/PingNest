@@ -16,7 +16,6 @@ export function Titlebar({ variant = 'app', closeLabel }: { variant?: TitlebarVa
   const closeText = closeLabel || (variant === 'app' ? '关闭窗口' : '退出应用')
   return (
     <header className={names.root}>
-      <div className={names.brand}><img src="./icon.png" alt="" /><b>PingNest</b></div>
       <div className={names.actions}>
         <button onClick={() => window.electronAPI?.app.minimize()} aria-label="最小化" title="最小化"><Minus size={14} /></button>
         <button onClick={() => window.electronAPI?.app.toggleMaximize()} aria-label="最大化或还原" title="最大化或还原"><Maximize2 size={13} /></button>

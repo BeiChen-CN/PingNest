@@ -1,38 +1,117 @@
-// PingNest 设计 token —— MD3「分层工作台」方案（视觉基准：public/md3-prototypes.html theme-b）
-// 颜色以 CSS 自定义属性暴露（运行时可换肤，如未来 data-theme 暗色），
-// 布局/间距/圆角/字阶用 SCSS 变量在编译期使用。
+// PingNest 设计 token —— 2026「奶油工作台」方案
+// 基调：淡奶油绿主色 + 墨绿信号块 + 奶油纸底；去 MD3 全盘化，
+// 控件靠细线、留白与少量品牌色组织层级。
+// 保留 --md-* 别名：九套通知样式（NotificationToast.scss）消费这些别名，
+// 换调色板时通知弹窗与主界面自动同步。
 
-// ---------- MD3 颜色角色 ----------
+// ---------- 亮色 ----------
 :root {
-  --md-primary: #006a6a;
+  color-scheme: light dark;
+
+  // 语义色（新体系）
+  --bg: #f3f1e6;
+  --bg2: #eae8db;
+  --panel: #fbfaf5;
+  --panel2: #f1efe4;
+  --ink: #262b22;
+  --ink2: #646b58;
+  --ink3: #99a08c;
+  --line: #e4e2d3;
+  --line2: #d6d3c1;
+  --brand: #7fa86b;
+  --brand-deep: #5f8a4c;
+  --brand-ink: #ffffff;
+  --brand-soft: #e9f1e0;
+  --brand-mist: #dce7ce;
+  --brand-softer: #f1f5e9;
+  --dark: #232b1d;
+  --dark-2: #31402a;
+  --on-dark: #efead8;
+  --on-dark-2: #b9c6a8;
+  --danger: #b36049;
+  --danger-soft: #f5e7df;
+  --shadow: 0 1px 3px rgba(40, 50, 32, .06), 0 8px 22px rgba(40, 50, 32, .07);
+
+  // --md-* 别名（通知样式与旧组件消费）
+  --md-primary: #5f8a4c;
   --md-on-primary: #ffffff;
-  --md-primary-container: #9cf1f0;
-  --md-on-primary-container: #002020;
-  --md-secondary-container: #cce8e7;
-  --md-on-secondary-container: #051f1f;
-  --md-tertiary-container: #ffddb3;
-  --md-on-tertiary-container: #2a1700;
-  --md-surface: #f5fafa;
-  --md-surface-low: #eff5f4;
-  --md-surface-container: #e7efee;
-  --md-surface-high: #dfe8e7;
-  --md-on-surface: #191c1c;
-  --md-on-surface-variant: #3f4948;
-  --md-outline: #6f7978;
-  --md-outline-variant: #bec9c7;
-  --md-error: #ba1a1a;
-  --md-error-container: #ffdad6;
-  --md-on-error-container: #410002;
-  --md-focus: #006a6a;
-  --md-scrim: rgba(24, 30, 29, .45);
+  --md-primary-container: #dce7ce;
+  --md-on-primary-container: #26361f;
+  --md-secondary-container: #e9f1e0;
+  --md-on-secondary-container: #37542c;
+  --md-tertiary-container: #f0e3d8;
+  --md-on-tertiary-container: #6e4a2e;
+  --md-surface: #f7f4e9;
+  --md-surface-low: #fbfaf5;
+  --md-surface-container: #f1efe4;
+  --md-surface-high: #e7e4d4;
+  --md-on-surface: #262b22;
+  --md-on-surface-variant: #646b58;
+  --md-outline: #8b927d;
+  --md-outline-variant: #d9d6c4;
+  --md-error: #b36049;
+  --md-error-container: #f5e7df;
+  --md-on-error-container: #6e3423;
+  --md-focus: #5f8a4c;
+  --md-scrim: rgba(20, 26, 14, .45);
+}
+
+// ---------- 暗色（同一奶油绿语言） ----------
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14170f;
+    --bg2: #1b2016;
+    --panel: #1d2318;
+    --panel2: #232b1d;
+    --ink: #e3e7d9;
+    --ink2: #aab3a0;
+    --ink3: #77816c;
+    --line: #2c3424;
+    --line2: #3a4233;
+    --brand: #a5c98f;
+    --brand-deep: #8fb579;
+    --brand-ink: #1c2b14;
+    --brand-soft: #2c3a22;
+    --brand-mist: #33422a;
+    --brand-softer: #20291a;
+    --dark: #0e1209;
+    --dark-2: #1a2313;
+    --on-dark: #e3e7d9;
+    --on-dark-2: #9db08a;
+    --danger: #e0a28c;
+    --danger-soft: #3c221a;
+    --shadow: 0 1px 3px rgba(0, 0, 0, .4), 0 10px 26px rgba(0, 0, 0, .45);
+
+    --md-primary: #a5c98f;
+    --md-on-primary: #1c2b14;
+    --md-primary-container: #3c5a2e;
+    --md-on-primary-container: #dce7ce;
+    --md-secondary-container: #2c3a22;
+    --md-on-secondary-container: #dce7ce;
+    --md-tertiary-container: #4a3320;
+    --md-on-tertiary-container: #f0e3d8;
+    --md-surface: #171b13;
+    --md-surface-low: #1b2018;
+    --md-surface-container: #242b20;
+    --md-surface-high: #2e3629;
+    --md-on-surface: #e3e7d9;
+    --md-on-surface-variant: #aab3a0;
+    --md-outline: #7c866f;
+    --md-outline-variant: #3a4233;
+    --md-error: #e8a08a;
+    --md-error-container: #5c2c1c;
+    --md-on-error-container: #f5ddd2;
+    --md-focus: #a5c98f;
+    --md-scrim: rgba(0, 0, 0, .6);
+  }
 }
 
 // ---------- 布局 ----------
-$window-bar-height: 38px;
-$nav-width: 224px;
-$nav-collapsed-width: 84px;
-$content-max: 1320px;
-$top-bar-height: 70px;
+$window-bar-height: 40px;
+$nav-width: 212px;
+$nav-collapsed-width: 76px;
+$content-max: 1120px;
+$top-bar-height: 60px;
 
 // ---------- 间距阶（4 的倍数） ----------
 $space-1: 4px;
@@ -44,52 +123,35 @@ $space-6: 24px;
 $space-8: 32px;
 
 // ---------- 圆角 ----------
-$radius-xs: 6px;     // 小徽标、进度条
-$radius-sm: 8px;     // 小型控件、缩略图
-$radius-md: 12px;    // 输入类控件
-$radius-lg: 16px;    // 卡片（--card-radius）
-$radius-xl: 24px;    // 导航项、胶囊按钮
+$radius-xs: 5px;
+$radius-sm: 8px;
+$radius-md: 11px;
+$radius-lg: 14px;
+$radius-xl: 20px;
 $radius-full: 50%;
 
 // ---------- 控件尺寸 ----------
-$control-height: 40px;     // 按钮
-$control-height-dense: 34px;   // chip / status-pill
-$input-height: 46px;       // 搜索栏
-$switch-width: 44px;
-$switch-height: 24px;
+$control-height: 36px;
+$control-height-dense: 30px;
+$input-height: 40px;
+$switch-width: 38px;
+$switch-height: 22px;
 
 // ---------- 字阶 ----------
-$font-family: 'Segoe UI Variable', 'Segoe UI', 'Microsoft YaHei UI', system-ui, sans-serif;
-$font-size-xs: 10px;    // kicker/eyebrow
-$font-size-sm: 12px;    // 正文辅助、标签
-$font-size-md: 13px;    // 导航、正文
-$font-size-base: 14px;  // 标题、区块头
-$font-size-lg: 19px;    // 页标题（紧凑）
-$font-size-xl: 22px;    // 页标题 / 大数字
-$font-size-stat: 23px;  // stat 数字
+$font-family: 'Segoe UI Variable Text', 'Segoe UI', 'Microsoft YaHei UI', system-ui, sans-serif;
+$font-size-xs: 10px;
+$font-size-sm: 12px;
+$font-size-md: 13px;
+$font-size-base: 14px;
+$font-size-lg: 19px;
+$font-size-xl: 22px;
+$font-size-stat: 26px;
 
-// ---------- 阴影（ elevation ） ----------
-$elevation-1: 0 1px 3px rgba(20, 30, 24, .12);
-$elevation-2: 0 2px 6px rgba(20, 30, 24, .16);
-$elevation-3: 0 6px 18px rgba(22, 38, 30, .18);
+// ---------- 阴影 ----------
+$elevation-1: 0 1px 2px rgba(40, 50, 32, .06);
+$elevation-2: 0 2px 6px rgba(40, 50, 32, .08);
+$elevation-3: 0 8px 22px rgba(40, 50, 32, .1);
 
-// ---------- SCSS 侧颜色别名（同 --md-* 值，供需要编译期运算的场景） ----------
-$md-primary: #006a6a;
-$md-on-primary: #ffffff;
-$md-primary-container: #9cf1f0;
-$md-on-primary-container: #002020;
-$md-secondary-container: #cce8e7;
-$md-on-secondary-container: #051f1f;
-$md-tertiary-container: #ffddb3;
-$md-on-tertiary-container: #2a1700;
-$md-surface: #f5fafa;
-$md-surface-low: #eff5f4;
-$md-surface-container: #e7efee;
-$md-surface-high: #dfe8e7;
-$md-on-surface: #191c1c;
-$md-on-surface-variant: #3f4948;
-$md-outline: #6f7978;
-$md-outline-variant: #bec9c7;
-$md-error: #ba1a1a;
-$md-error-container: #ffdad6;
-$md-on-error-container: #410002;
+// ---------- SCSS 侧颜色别名 ----------
+$md-primary: #5f8a4c;
+$md-error: #b36049;

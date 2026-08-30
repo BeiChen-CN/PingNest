@@ -1,407 +1,172 @@
-// MD3 基础组件层：所有页面共享的控件语言（胶囊按钮、chip、开关、surface 卡片等）。
-// 类名与 features/dashboard/components 下的 React 组件对应。
+// PingNest 控件库 —— 2026「奶油工作台」
+// 原则：细线 + 留白组织层级；品牌色只出现在主按钮、开关、选中态与信号上。
+// 消费的类名：.md-button / .button / .switch / .chip / .segf / .card / .setrow /
+// .modal-backdrop / .confirm-dialog / .toast-* / .select-* / .icon-button / .avatar / .pill
+
 @use './tokens' as *;
 @use './motion' as *;
 
-// ---------- 表面 / 卡片 ----------
-.surface {
-  background: var(--md-surface-low);
-  border: 1px solid transparent;
+// ---------- 卡片 ----------
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
   border-radius: $radius-lg;
-  overflow: hidden;
+  box-shadow: var(--shadow);
 }
-
-.section-head {
-  min-height: 54px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: $space-3;
-  padding: 0 $space-4;
-  border-bottom: 1px solid var(--md-outline-variant);
-
-  h2 { margin: 0; font-size: $font-size-base; font-weight: 650; color: var(--md-on-surface); }
-  h3 { margin: 0; font-size: $font-size-base; font-weight: 650; color: var(--md-on-surface); }
-}
-
-.text-action {
-  border: 0;
-  color: var(--md-primary);
-  background: transparent;
-  font-size: $font-size-sm;
-  font-weight: 650;
-  cursor: pointer;
-  &:hover { text-decoration: underline; }
-}
+.card-pad { padding: $space-4 18px; }
 
 // ---------- 按钮 ----------
-// 新组件请用 .md-button；.button 保留给 ConfirmDialog 等既有调用点。
-.md-button,
-.button {
-  min-height: $control-height;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: $space-2;
-  padding: 0 18px;
-  border: 0;
-  border-radius: 20px;
-  font: inherit;
-  font-size: $font-size-sm;
-  font-weight: 650;
-  cursor: pointer;
-  transition: background $motion-duration-base ease, box-shadow $motion-duration-base ease;
-  white-space: nowrap;
-
-  &.filled {
-    color: var(--md-on-primary);
-    background: var(--md-primary);
-    &:hover:not(:disabled) { box-shadow: $elevation-1; }
-  }
-  &.tonal {
-    color: var(--md-on-secondary-container);
-    background: var(--md-secondary-container);
-    &:hover:not(:disabled) { box-shadow: $elevation-1; }
-  }
-  &.outlined {
-    color: var(--md-primary);
-    background: transparent;
-    border: 1px solid var(--md-outline);
-  }
-  &.danger,
-  &.danger-action {
-    color: var(--md-error);
-    background: transparent;
-    border: 1px solid var(--md-error);
-  }
-  &:disabled { opacity: .45; cursor: default; }
+.md-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  height: $control-height; padding: 0 16px; border-radius: $radius-sm;
+  border: 1px solid transparent; font-size: $font-size-md; font-weight: 600;
+  font-family: inherit; cursor: pointer; transition: all 160ms ease; white-space: nowrap;
+  &.filled { background: var(--dark); color: var(--on-dark); border-color: var(--dark);
+    &:hover:not(:disabled) { background: var(--dark-2); border-color: var(--dark-2); } }
+  &.tonal { background: var(--brand-soft); color: var(--brand-deep);
+    &:hover:not(:disabled) { background: var(--brand-mist); } }
+  &.outlined { background: var(--panel); color: var(--ink); border-color: var(--line2);
+    &:hover:not(:disabled) { border-color: var(--brand); color: var(--brand-deep); } }
+  &.text { background: transparent; color: var(--brand-deep); padding: 0 10px;
+    &:hover:not(:disabled) { background: var(--brand-softer); } }
+  &.danger-action { background: transparent; color: var(--danger); border-color: color-mix(in srgb, var(--danger) 32%, transparent);
+    &:hover:not(:disabled) { background: var(--danger-soft); border-color: var(--danger); } }
+  &:disabled { opacity: .45; cursor: not-allowed; }
   &.full { width: 100%; }
+  &.sm { height: $control-height-dense; padding: 0 12px; font-size: $font-size-sm; }
+}
+
+// ConfirmDialog 等既有调用点的 .button
+.button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: $control-height; padding: 0 18px; border-radius: $radius-sm;
+  border: 1px solid var(--line2); background: var(--panel); color: var(--ink);
+  font-size: $font-size-md; font-weight: 600; font-family: inherit; cursor: pointer; transition: all 160ms ease;
+  &:hover:not(:disabled) { border-color: var(--brand); color: var(--brand-deep); }
+  &.danger { background: var(--danger); border-color: var(--danger); color: #fff;
+    &:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 85%, black); } }
+  &:disabled { opacity: .5; cursor: not-allowed; }
 }
 
 .icon-button {
-  width: 40px;
-  height: 40px;
-  display: grid;
-  place-items: center;
-  padding: 0;
-  border: 0;
-  border-radius: $radius-full;
-  color: var(--md-on-surface-variant);
-  background: transparent;
-  cursor: pointer;
-  transition: background $motion-duration-base ease;
-  &:hover { background: var(--md-surface-high); }
-  &:disabled { opacity: .45; cursor: default; }
+  display: inline-grid; place-items: center; width: 26px; height: 26px; padding: 0;
+  border: 0; border-radius: $radius-sm; background: transparent; color: var(--ink2); cursor: pointer;
+  transition: all 140ms ease;
+  &:hover { background: var(--panel2); color: var(--ink); }
 }
 
-// ---------- Chip / 状态胶囊 ----------
-.chip {
-  min-height: $control-height-dense;
-  padding: 0 14px;
-  color: var(--md-on-surface-variant);
-  background: transparent;
-  border: 1px solid var(--md-outline);
-  border-radius: $radius-xs;
-  font: inherit;
-  font-size: $font-size-sm;
-  font-weight: 650;
-  cursor: pointer;
-  transition: background $motion-duration-base ease, color $motion-duration-base ease;
-
-  &.active {
-    color: var(--md-on-secondary-container);
-    background: var(--md-secondary-container);
-    border-color: transparent;
-  }
-}
-
-.status-pill {
-  min-height: $control-height-dense;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 0 $space-3;
-  color: var(--md-on-secondary-container);
-  background: var(--md-secondary-container);
-  border-radius: 18px;
-  font-size: $font-size-sm;
-  font-weight: 650;
-  white-space: nowrap;
-
-  &::before {
-    content: '';
-    width: 7px;
-    height: 7px;
-    background: var(--md-primary);
-    border-radius: $radius-full;
-  }
-}
-
-// ---------- 开关（描边式） ----------
+// ---------- 开关 ----------
 .switch {
-  width: $switch-width;
-  height: $switch-height;
-  display: flex;
-  align-items: center;
-  padding: 2px;
-  border: 2px solid var(--md-outline);
-  border-radius: 14px;
-  background: var(--md-surface-high);
-  cursor: pointer;
-  transition: background $motion-duration-base ease, border-color $motion-duration-base ease;
-
-  span {
-    width: 16px;
-    height: 16px;
-    background: var(--md-outline);
-    border-radius: $radius-full;
-    transition: transform $motion-duration-base ease, background $motion-duration-base ease;
-  }
-
-  &:disabled { opacity: .45; cursor: default; }
-
-  &.checked {
-    border-color: var(--md-primary);
-    background: var(--md-primary);
-    span { background: var(--md-on-primary); transform: translateX(20px); }
-  }
+  position: relative; width: $switch-width; height: $switch-height; flex: 0 0 $switch-width;
+  border: 0; border-radius: 999px; padding: 0; cursor: pointer;
+  background: color-mix(in srgb, var(--ink3) 40%, transparent); transition: background var(--mt-fast, 160ms) var(--mt-ease, ease);
+  &.checked { background: var(--brand); }
+  &.checked span { transform: translateX(16px); }
+  &:disabled { opacity: .4; cursor: not-allowed; }
+  span { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .25); transition: transform var(--mt-med, 180ms) var(--mt-spring, cubic-bezier(.3, 1.2, .4, 1)); }
 }
 
-// ---------- 表单 ----------
-input[type='range'] {
-  width: 100%;
-  accent-color: var(--md-primary);
-  cursor: pointer;
+// ---------- 芯片 / 徽标 ----------
+.chip { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700;
+  padding: 3px 9px; border-radius: 999px; background: var(--brand-soft); color: var(--brand-deep); }
+.chip.gray { background: var(--bg2); color: var(--ink2); }
+.chip.warn { background: var(--danger-soft); color: var(--danger); }
+
+.badge { display: inline-grid; place-items: center; min-width: 17px; height: 17px; padding: 0 5px;
+  border-radius: 999px; background: var(--brand); color: #fff; font-size: 10px; font-weight: 800; font-style: normal; }
+
+.status-pill { display: inline-flex; align-items: center; gap: 7px; height: $control-height-dense;
+  padding: 0 13px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line);
+  font-size: $font-size-sm; font-weight: 650; color: var(--ink2); }
+
+// ---------- 分段选择 ----------
+.segf { display: inline-flex; background: var(--bg2); border-radius: $radius-sm; padding: 3px; gap: 2px;
+  button { border: 0; background: transparent; padding: 5px 13px; font-size: $font-size-sm; border-radius: calc(#{$radius-sm} - 3px);
+    cursor: pointer; color: var(--ink2); font-family: inherit; font-weight: 600; transition: all 140ms ease; white-space: nowrap;
+    &:hover { color: var(--ink); }
+    &.on { background: var(--panel); color: var(--brand-deep); box-shadow: 0 1px 3px rgba(0, 0, 0, .1); } }
 }
 
-// ---------- 设置行 / 统计卡 / 进度 ----------
-.setting-row {
-  min-height: 58px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: $space-4;
-  padding: $space-2 0;
-  border-bottom: 1px solid var(--md-outline-variant);
+// ---------- 搜索框 ----------
+.searchbar { display: flex; align-items: center; gap: 8px; background: var(--panel);
+  border: 1px solid var(--line2); border-radius: $radius-sm; padding: 0 12px; height: $input-height;
+  color: var(--ink3); transition: border-color 160ms ease;
+  &:focus-within { border-color: var(--brand); }
+  input { border: 0; outline: 0; background: transparent; flex: 1; color: var(--ink); font-size: $font-size-md; min-width: 0; }
+}
+
+// ---------- 列表行 / 设置行 ----------
+.setrow { display: flex; align-items: center; gap: 14px; padding: 13px 18px; border-bottom: 1px solid var(--line);
   &:last-child { border-bottom: 0; }
-
-  b { display: block; font-size: $font-size-sm; font-weight: 650; color: var(--md-on-surface); }
-  span { display: block; margin-top: 3px; color: var(--md-on-surface-variant); font-size: $font-size-xs; }
+  .st { flex: 1; min-width: 0; b { font-size: $font-size-md; display: block; }
+    span { font-size: $font-size-sm; color: var(--ink2); } }
 }
 
-.stat {
-  min-height: 108px;
-  padding: $space-4;
-  background: var(--md-surface-low);
-  border: 1px solid transparent;
-  border-radius: $radius-lg;
-
-  .stat-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: $space-2;
-    color: var(--md-on-surface-variant);
-    font-size: $font-size-sm;
-    svg { color: var(--md-primary); }
-  }
-  strong { display: block; margin: $space-3 0 $space-1; font-size: $font-size-stat; line-height: 1; color: var(--md-on-surface); }
-  small { color: var(--md-on-surface-variant); font-size: $font-size-sm; }
-}
-
-.progress {
-  height: 6px;
-  overflow: hidden;
-  background: var(--md-surface-high);
-  border-radius: 3px;
-  span { display: block; height: 100%; background: var(--md-primary); border-radius: inherit; }
-}
-
-// ---------- 自定义 Select ----------
-.select-wrap { position: relative; }
-
-.select-trigger {
-  min-height: $control-height-dense;
-  display: inline-flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: $space-2;
-  padding: 0 12px;
-  font: inherit;
-  font-size: $font-size-sm;
-  color: var(--md-on-surface);
-  background: var(--md-surface-container);
-  border: 1px solid var(--md-outline-variant);
-  border-radius: $radius-xs;
-  cursor: pointer;
-  transition: border-color $motion-duration-base ease, background $motion-duration-base ease;
-
-  &:hover { background: var(--md-surface-high); }
-  .select-wrap.open & { border-color: var(--md-primary); }
-  .select-wrap.disabled & { opacity: .45; cursor: default; }
-}
-
-.custom-select-menu {
-  position: absolute;
-  z-index: 60;
-  min-width: 100%;
-  max-height: 224px;
-  overflow-y: auto;
-  padding: $space-1;
-  background: var(--md-surface-low);
-  border: 1px solid var(--md-outline-variant);
-  border-radius: $radius-md;
-  box-shadow: $elevation-3;
-  animation: motion-fade-up $motion-duration-fast $motion-ease-out both;
-}
-
-.custom-select-option {
-  min-height: 34px;
-  display: flex;
-  align-items: center;
-  padding: 0 10px;
-  border-radius: $radius-xs;
-  font-size: $font-size-sm;
-  color: var(--md-on-surface);
-  cursor: pointer;
-
-  &.active { background: var(--md-surface-container); }
-  &.selected { color: var(--md-primary); font-weight: 650; }
-}
-
-// ---------- 对话框 ----------
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1500;
-  display: grid;
-  place-items: center;
-  background: var(--md-scrim);
-  animation: motion-fade-in $motion-duration-fast ease both;
-}
-
-.confirm-dialog {
-  width: min(400px, calc(100vw - 48px));
-  padding: $space-5;
-  background: var(--md-surface-low);
-  border-radius: $radius-lg;
-  box-shadow: $elevation-3;
-  animation: motion-fade-up $motion-duration-base $motion-ease-out both;
-
-  .dialog-icon {
-    width: 40px;
-    height: 40px;
-    display: grid;
-    place-items: center;
-    margin-bottom: $space-3;
-    color: var(--md-error);
-    background: var(--md-error-container);
-    border-radius: $radius-full;
-  }
-
-  h2 { margin: 0 0 $space-2; font-size: $font-size-base; color: var(--md-on-surface); }
-  p { margin: 0 0 $space-4; font-size: $font-size-sm; line-height: 1.6; color: var(--md-on-surface-variant); }
-
-  div:last-child { display: flex; justify-content: flex-end; gap: $space-2; }
-}
-
-// ---------- Snackbar / Toast ----------
-.toast-host {
-  position: fixed;
-  right: 22px;
-  bottom: 18px;
-  z-index: 2000;
-  display: flex;
-  flex-direction: column;
-  gap: $space-2;
-  pointer-events: none;
-}
-
-.toast-item {
-  display: flex;
-  align-items: center;
-  gap: $space-2;
-  min-width: 220px;
-  max-width: 340px;
-  min-height: 46px;
-  padding: 0 $space-3 0 $space-4;
-  color: #ffffff;
-  background: #2d312f;
-  border-radius: $radius-xs;
-  box-shadow: $elevation-3;
-  font-size: $font-size-sm;
-  line-height: 1.4;
-  pointer-events: auto;
-  animation: motion-fade-up $motion-duration-base $motion-ease-out both;
-
-  &.success svg { color: #7eddb2; }
-  &.error svg { color: #ffb4ab; }
-  &.info svg { color: #c8e7f5; }
-
-  span { flex: 1; min-width: 0; }
-  .icon-button { flex: 0 0 auto; width: 24px; height: 24px; color: rgba(255, 255, 255, .7); &:hover { background: rgba(255, 255, 255, .12); color: #fff; } }
-}
-
-// ---------- 状态反馈 ----------
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: $space-1;
-  padding: $space-8 $space-4;
-  color: var(--md-on-surface-variant);
-  text-align: center;
-  b { color: var(--md-on-surface); font-size: $font-size-base; }
-  span { font-size: $font-size-sm; }
-}
-
-.page-loading {
-  height: 100vh;
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: $space-2;
-  color: var(--md-on-surface-variant);
-  background: var(--md-surface);
-  b { color: var(--md-on-surface); }
-
-  &.load-error .button { margin-top: $space-2; }
-}
-
-.error-banner {
-  display: flex;
-  align-items: center;
-  gap: $space-2;
-  padding: $space-2 $space-4;
-  color: var(--md-on-error-container);
-  background: var(--md-error-container);
-  border-radius: $radius-md;
-  font-size: $font-size-sm;
-
-  svg { flex: 0 0 auto; color: var(--md-error); }
-  span { flex: 1; min-width: 0; }
-  .icon-button { width: 28px; height: 28px; }
+.datarow { display: flex; justify-content: space-between; align-items: baseline; gap: $space-3;
+  padding: 8px 0; border-bottom: 1px dashed var(--line); font-size: $font-size-md; color: var(--ink2);
+  &:last-child { border-bottom: 0; }
+  b { color: var(--ink); font-weight: 650; }
 }
 
 // ---------- 头像 ----------
-.avatar {
-  flex: 0 0 auto;
-  display: grid;
-  place-items: center;
-  object-fit: cover;
-  color: var(--md-primary);
-  background: var(--md-secondary-container);
-  border-radius: $radius-full;
-  font-size: $font-size-sm;
-  font-weight: 700;
-
-  &.fallback { overflow: hidden; }
+.avatar { width: 34px; height: 34px; border-radius: 11px; flex: 0 0 34px; display: grid; place-items: center;
+  font-size: $font-size-md; font-weight: 750; color: #fff; user-select: none;
+  background: linear-gradient(135deg, var(--brand), var(--brand-deep));
+  &.fallback { font-size: $font-size-md; }
+  img { width: 100%; height: 100%; border-radius: inherit; object-fit: cover; display: block; }
 }
 
-.spin { animation: motion-spin 1s linear infinite; }
-
-@media (prefers-reduced-motion: reduce) {
-  .toast-item,
-  .confirm-dialog,
-  .custom-select-menu { animation: none; }
+// ---------- 模态（ConfirmDialog）----------
+.modal-backdrop { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center;
+  background: var(--md-scrim); backdrop-filter: blur(3px); }
+.confirm-dialog { width: min(400px, calc(100vw - 48px)); background: var(--panel); border: 1px solid var(--line);
+  border-radius: $radius-lg; box-shadow: var(--shadow); padding: 22px 22px 18px; text-align: center;
+  h2 { font-size: 16px; margin: 10px 0 8px; }
+  p { font-size: $font-size-md; color: var(--ink2); line-height: 1.7; margin-bottom: 18px; }
+  > div { display: flex; gap: 10px; justify-content: center; }
+  .dialog-icon { width: 40px; height: 40px; margin: 0 auto; border-radius: 12px; display: grid; place-items: center;
+    background: var(--danger-soft); color: var(--danger); }
 }
+
+// ---------- 无边框窗口自绘标题栏 ----------
+.titlebar {
+  height: $window-bar-height; flex: 0 0 $window-bar-height;
+  display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+  padding: 0 10px 0 16px; background: var(--panel); border-bottom: 1px solid var(--line);
+  -webkit-app-region: drag; user-select: none;
+}
+.window-actions { display: flex; align-items: center; gap: 4px; -webkit-app-region: no-drag;
+  button { width: 32px; height: 28px; display: grid; place-items: center; border: 0; border-radius: $radius-sm;
+    background: transparent; color: var(--ink2); cursor: pointer; transition: all 140ms ease;
+    &:hover { background: var(--panel2); color: var(--ink); }
+    &.close:hover { background: var(--danger); color: #fff; } } }
+
+// ---------- Toast ----------
+.toast-host { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 300;
+  display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.toast-item { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: $radius-sm;
+  background: var(--dark); color: var(--on-dark); font-size: $font-size-md; box-shadow: var(--shadow);
+  animation: motion-fade-up $motion-duration-fast $motion-ease-out both;
+  .icon-button { color: var(--on-dark-2); width: 20px; height: 20px;
+    &:hover { background: rgba(255, 255, 255, .12); color: var(--on-dark); } }
+  &.error { background: var(--danger); color: #fff; }
+}
+
+// ---------- SelectField ----------
+.select-wrap { position: relative; display: inline-block;
+  &.disabled { opacity: .5; pointer-events: none; } }
+.select-trigger { display: inline-flex; align-items: center; justify-content: space-between; gap: 10px;
+  height: $control-height; min-width: 150px; padding: 0 12px; border-radius: $radius-sm;
+  border: 1px solid var(--line2); background: var(--panel); color: var(--ink); font-size: $font-size-md;
+  font-family: inherit; cursor: pointer; transition: border-color 160ms ease;
+  &:hover { border-color: var(--brand); }
+  .select-wrap.open & { border-color: var(--brand); } }
+.custom-select-menu { position: fixed; z-index: 260; background: var(--panel); border: 1px solid var(--line2);
+  border-radius: $radius-sm; box-shadow: var(--shadow); overflow-y: auto; padding: 4px; }
+.custom-select-option { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px;
+  border: 0; border-radius: $radius-xs; background: transparent; color: var(--ink); font-size: $font-size-md;
+  font-family: inherit; text-align: left; cursor: pointer;
+  svg { opacity: 0; flex: 0 0 auto; }
+  &.selected svg { opacity: 1; color: var(--brand-deep); }
+  &.active { background: var(--brand-softer); } }

@@ -1,4 +1,4 @@
-import { BellRing, Database, GitBranch, Heart, LockKeyhole, ShieldCheck } from 'lucide-react'
+import { BellRing, ShieldCheck, Database, LockKeyhole, GitBranch, Globe } from 'lucide-react'
 import type { AppConfig, AppStatus } from '../types'
 
 interface Props {
@@ -8,18 +8,41 @@ interface Props {
 }
 
 export function AboutPage({ config, status, entryCount }: Props) {
-  return <section className="about-page page-body">
-    <div className="about-hero surface">
-      <div className="about-brand-mark"><BellRing size={25} /></div>
-      <div className="about-hero-copy"><span className="about-eyebrow">本地通知伴侣</span><h2>PingNest</h2><p>把重要的微信消息，安静而可靠地带到桌面。</p></div>
-      <span className="about-version">v{__APP_VERSION__}</span>
+  const healthy = status.connected && status.wcdbReady && !status.pushError
+  return <section className="about-page">
+    <div className="bento">
+      <div className="bx bx-hero" style={{ gridColumn: 'span 2' }}>
+        <img className="about-icon" src="./icon.png" alt="PingNest 图标" />
+        <h4>PINGNEST</h4>
+        <div className="big">v{__APP_VERSION__}</div>
+        <div className="sub" style={{ fontSize: 12.5, lineHeight: 1.9, marginTop: 10 }}>
+          把重要的微信消息带到桌面，用更少的打扰换来更清晰的工作节奏。<br />
+          九种通知样式 · 堆叠队列 · 静音规则 · 本地加密存储
+        </div>
+      </div>
+      <div className="bx">
+        <h4>当前状态</h4>
+        <div className="kv2" style={{ marginTop: 8 }}><span>微信账号</span><b>{status.config.myWxName || '未识别'}</b></div>
+        <div className="kv2"><span>消息监听</span><b style={healthy ? { color: 'var(--brand-deep)' } : undefined}>{healthy ? '正常运行' : '未连接'}</b></div>
+        <div className="kv2"><span>通知历史</span><b>{config.notifyCenterEnabled ? `${entryCount} 条` : '未启用'}</b></div>
+      </div>
+      <div className="bx">
+        <h4>本地优先</h4>
+        <div className="sub" style={{ fontSize: 12, lineHeight: 2.1, marginTop: 8 }}>
+          <span className="ap-line"><LockKeyhole size={12} /> 通知内容只留在这台设备</span>
+          <span className="ap-line"><Database size={12} /> 本地保存通知历史</span>
+          <span className="ap-line"><GitBranch size={12} /> 配置与数据独立存储</span>
+          <span className="ap-line"><Globe size={12} /> 头像经微信 CDN 拉取</span>
+        </div>
+      </div>
+      <div className="bx" style={{ gridColumn: 'span 3' }}>
+        <h4>许可与致谢</h4>
+        <div className="sub" style={{ marginTop: 8 }}>
+          <span className="ap-line"><ShieldCheck size={12} /> CC BY-NC-SA 4.0 · 非商业使用需遵守许可条款</span>
+          <span className="ap-line"><BellRing size={12} /> 感谢 WeFlow 提供思路与参考</span>
+          <span className="ap-line">第三方许可清单见安装包 resources/licenses</span>
+        </div>
+      </div>
     </div>
-
-    <div className="about-grid">
-      <section className="surface about-card about-principles"><div className="about-card-head"><ShieldCheck size={17} /><div><h3>本地优先</h3><p>你的通知内容只留在这台设备上。</p></div></div><div className="about-principle-list"><div><LockKeyhole size={15} /><span>不上传聊天内容</span></div><div><Database size={15} /><span>本地保存通知历史</span></div><div><GitBranch size={15} /><span>配置与数据独立存储</span></div></div></section>
-      <section className="surface about-card"><div className="about-card-head"><BellRing size={17} /><div><h3>当前状态</h3><p>应用与微信连接信息</p></div></div><dl className="about-status-list"><div><dt>微信账号</dt><dd>{status.config.myWxName || '未识别'}</dd></div><div><dt>消息监听</dt><dd className={status.connected && status.wcdbReady ? 'good' : ''}>{status.connected && status.wcdbReady ? '正常运行' : '未连接'}</dd></div><div><dt>通知历史</dt><dd>{config.notifyCenterEnabled ? `${entryCount} 条` : '未启用'}</dd></div></dl></section>
-      <section className="surface about-card about-features"><div className="about-card-head"><Heart size={17} /><div><h3>PingNest 的工作方式</h3><p>专注于提醒本身，不打扰你的工作流。</p></div></div><div className="about-feature-grid"><span>桌面通知</span><span>历史检索</span><span>静音规则</span><span>托盘运行</span></div></section>
-    </div>
-    <p className="about-footer">PingNest · 数据仅保存在本机 · 感谢你的使用</p>
   </section>
 }

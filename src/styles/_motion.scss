@@ -28,3 +28,107 @@ $motion-ease-in: cubic-bezier(.4, 0, 1, 1);
 @keyframes motion-spin {
   to { transform: rotate(360deg); }
 }
+
+// ============================================================
+// 全局动效方案（用户可在「外观 → 动效风格」选择）：
+// 经 <html data-motion="..."> 驱动以下 CSS 变量整套切换。
+// 默认 satin（绸缎）。
+// ============================================================
+:root, html[data-motion='satin'] {
+  --mt-ease: cubic-bezier(.22, 1, .36, 1);
+  --mt-spring: cubic-bezier(.22, 1, .36, 1);
+  --mt-fast: 160ms; --mt-med: 300ms; --mt-slow: 440ms;
+  --mt-y: 14px; --mt-blur: 6px; --mt-stagger: 55ms;
+}
+html[data-motion='droplet'] {
+  --mt-ease: cubic-bezier(.34, 1.3, .5, 1);
+  --mt-spring: cubic-bezier(.34, 1.56, .64, 1);
+  --mt-fast: 200ms; --mt-med: 340ms; --mt-slow: 460ms;
+  --mt-y: 10px; --mt-blur: 0px; --mt-stagger: 45ms;
+}
+html[data-motion='ink'] {
+  --mt-ease: cubic-bezier(.25, .6, .3, 1);
+  --mt-spring: cubic-bezier(.25, .6, .3, 1);
+  --mt-fast: 110ms; --mt-med: 170ms; --mt-slow: 220ms;
+  --mt-y: 6px; --mt-blur: 0px; --mt-stagger: 22ms;
+}
+html[data-motion='drift'] {
+  --mt-ease: cubic-bezier(.16, 1, .3, 1);
+  --mt-spring: cubic-bezier(.22, 1, .36, 1);
+  --mt-fast: 240ms; --mt-med: 420ms; --mt-slow: 640ms;
+  --mt-y: 26px; --mt-blur: 10px; --mt-stagger: 70ms;
+}
+
+// ---------- 载入 / 切页入场 ----------
+@keyframes motion-blk-in {
+  from { opacity: 0; transform: translateY(var(--mt-y)); filter: blur(var(--mt-blur)); }
+  to { opacity: 1; transform: none; filter: blur(0); }
+}
+@keyframes motion-blk-drop {
+  0% { opacity: 0; transform: scale(.92) translateY(var(--mt-y)); }
+  70% { opacity: 1; transform: scale(1.015) translateY(0); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes motion-pg-enter {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes motion-pg-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes motion-pg-drift {
+  from { opacity: 0; transform: translateY(22px); filter: blur(8px); }
+  to { opacity: 1; transform: none; filter: blur(0); }
+}
+
+// 页面容器：AppShell 以 key={page} 重挂触发
+.page { animation: motion-pg-enter var(--mt-slow) var(--mt-ease) both; }
+html[data-motion='ink'] .page { animation-name: motion-pg-fade; animation-duration: var(--mt-slow); }
+html[data-motion='drift'] .page { animation-name: motion-pg-drift; animation-duration: var(--mt-slow); }
+
+// Bento 块 + 问候栏逐块浮现（挂载即播，切页重挂自然重播）
+.page .bx, .page .greet { animation: motion-blk-in var(--mt-slow) var(--mt-ease) both; }
+.page .bx:nth-child(2) { animation-delay: var(--mt-stagger); }
+.page .bx:nth-child(3) { animation-delay: calc(var(--mt-stagger) * 2); }
+.page .bx:nth-child(4) { animation-delay: calc(var(--mt-stagger) * 3); }
+.page .bx:nth-child(5) { animation-delay: calc(var(--mt-stagger) * 4); }
+.page .bx:nth-child(6) { animation-delay: calc(var(--mt-stagger) * 5); }
+.page .bx:nth-child(7) { animation-delay: calc(var(--mt-stagger) * 6); }
+.page .bx:nth-child(8) { animation-delay: calc(var(--mt-stagger) * 7); }
+html[data-motion='droplet'] .page .bx,
+html[data-motion='droplet'] .page .greet { animation-name: motion-blk-drop; animation-timing-function: var(--mt-spring); }
+
+// ---------- 卡片 hover ----------
+.bx { transition: transform var(--mt-med) var(--mt-ease), box-shadow var(--mt-med) var(--mt-ease), border-color 160ms ease; }
+html[data-motion='satin'] .bx:hover,
+html[data-motion='drift'] .bx:hover { transform: translateY(-4px); box-shadow: 0 14px 32px rgba(40, 50, 32, .13); }
+html[data-motion='droplet'] .bx:hover { transform: scale(1.02); box-shadow: 0 12px 28px rgba(40, 50, 32, .13); }
+html[data-motion='ink'] .bx:hover { border-color: var(--brand); }
+
+// ---------- 侧栏滑行胶囊 ----------
+.navpill { transition: transform var(--mt-med) var(--mt-spring), height var(--mt-med) var(--mt-ease); }
+html[data-motion='ink'] .navpill { transition-duration: var(--mt-fast); }
+
+// ---------- 命令面板开合 ----------
+@keyframes motion-pal-in {
+  from { opacity: 0; transform: translateY(-10px) scale(.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes motion-pal-drop {
+  0% { opacity: 0; transform: translateY(-12px) scale(.9); }
+  75% { opacity: 1; transform: translateY(2px) scale(1.02); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes motion-pal-drift {
+  from { opacity: 0; transform: translateY(-18px) scale(.97); filter: blur(6px); }
+  to { opacity: 1; transform: none; filter: blur(0); }
+}
+.palette-backdrop .palette { animation: motion-pal-in var(--mt-med) var(--mt-ease) both; transform-origin: 24px 0; }
+html[data-motion='droplet'] .palette-backdrop .palette { animation-name: motion-pal-drop; animation-timing-function: var(--mt-spring); }
+html[data-motion='ink'] .palette-backdrop .palette { animation-duration: var(--mt-fast); }
+html[data-motion='drift'] .palette-backdrop .palette { animation-duration: var(--mt-med); animation-name: motion-pal-drift; }
+
+// drift 专属：大块静置漂浮（仅主页 hero 与两块，避免全屏晃动）
+@media (prefers-reduced-motion: no-preference) {
+  html[data-motion='drift'] .bx-hero { animation: motion-drift-float 5.5s ease-in-out infinite; }
+}
+@keyframes motion-drift-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+

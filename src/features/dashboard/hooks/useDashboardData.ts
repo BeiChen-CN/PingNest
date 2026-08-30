@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { DEFAULT_CONFIG, type AppConfig, type AppStatus, type HookProgress, type NotifyCenterEntry, type SaveConfig } from '../types'
+import { DEFAULT_CONFIG, type AppConfig, type AppStatus, type HookProgress, type NotifyCenterEntry, type NotifyCenterPatch, type SaveConfig } from '../types'
 import { toast } from '../stores/toastStore'
 
 const DEMO_ENTRIES: NotifyCenterEntry[] = [
@@ -26,6 +26,7 @@ export function useDashboardData(onNavigateToSession: (sessionId: string, entrie
   const [hookProgress, setHookProgress] = useState<HookProgress | null>(null)
   const [lastStatusAt, setLastStatusAt] = useState<number | null>(null)
   const [errorMessage, setErrorMessage] = useState('')
+  const [destructiveBusy, setDestructiveBusy] = useState(false)
   const entriesRef = useRef<NotifyCenterEntry[]>([])
   const navigateRef = useRef(onNavigateToSession)
   const saveRevisionRef = useRef<Record<string, number>>({})
@@ -35,6 +36,45 @@ export function useDashboardData(onNavigateToSession: (sessionId: string, entrie
     entriesRef.current = nextEntries
     setEntries(nextEntries)
   }, [])
+
+  /**
+   * 通知中心增量合并：主进程只推送变更条目（万条级历史时避免每次全量传输）。
+   * 载荷形状异常时回退为全量拉取，保证渲染层与主进程最终一致。
+   */
+  const applyNotifyCenterPatch = useCallback((incoming: unknown) => {
+    const patch = incoming as NotifyCenterPatch | null
+    if (!patch || patch.kind !== 'patch') {
+      void window.electronAPI?.notifyCenter.list()
+        .then((list) => applyEntries(list as NotifyCenterEntry[]))
+        .catch(() => {})
+      return
+    }
+    if (patch.clear) {
+      applyEntries([])
+      return
+    }
+    let next = entriesRef.current
+    let mutated = false
+    if (patch.removedIds && patch.removedIds.length > 0) {
+      const removedIds = new Set(patch.removedIds)
+      next = next.filter((entry) => !removedIds.has(entry.id))
+      mutated = true
+    }
+    if (patch.updated && patch.updated.length > 0) {
+      const byId = new Map(patch.updated.map((entry) => [entry.id, entry]))
+      next = next.map((entry) => byId.get(entry.id) ?? entry)
+      mutated = true
+    }
+    if (patch.added && patch.added.length > 0) {
+      const existingIds = new Set(next.map((entry) => entry.id))
+      const fresh = patch.added.filter((entry) => !existingIds.has(entry.id))
+      if (fresh.length > 0) {
+        next = [...fresh, ...next]
+        mutated = true
+      }
+    }
+    if (mutated) applyEntries(next)
+  }, [applyEntries])
 
   const loadStatus = useCallback(async (): Promise<boolean> => {
     if (!window.electronAPI) {
@@ -89,7 +129,7 @@ export function useDashboardData(onNavigateToSession: (sessionId: string, entrie
 
   useEffect(() => {
     void refresh()
-    const removeUpdate = window.electronAPI?.notifyCenter.onUpdate((next) => applyEntries(next as NotifyCenterEntry[]))
+    const removeUpdate = window.electronAPI?.notifyCenter.onUpdate(applyNotifyCenterPatch)
     const removeHookProgress = window.electronAPI?.app.onHookProgress(setHookProgress)
     const removeNavigate = window.electronAPI?.onNavigateToSession(async (sessionId) => {
       try {
@@ -103,7 +143,7 @@ export function useDashboardData(onNavigateToSession: (sessionId: string, entrie
     })
     const statusTimer = window.setInterval(() => { void loadStatus() }, 5000)
     return () => { removeUpdate?.(); removeHookProgress?.(); removeNavigate?.(); window.clearInterval(statusTimer) }
-  }, [applyEntries, loadStatus, refresh])
+  }, [applyEntries, applyNotifyCenterPatch, loadStatus, refresh])
 
   const saveConfig: SaveConfig = async (key, value) => {
     const revision = (saveRevisionRef.current[String(key)] || 0) + 1
@@ -244,6 +284,7 @@ export function useDashboardData(onNavigateToSession: (sessionId: string, entrie
   }
 
   const removeEntry = (id: string): Promise<boolean> => performAction({
+    setBusy: setDestructiveBusy,
     successToast: '已删除该条记录',
     errorPrefix: '删除通知失败：',
     run: async () => {
@@ -254,6 +295,7 @@ export function useDashboardData(onNavigateToSession: (sessionId: string, entrie
   })
 
   const clearEntries = (): Promise<boolean> => performAction({
+    setBusy: setDestructiveBusy,
     successToast: '通知历史已清空',
     errorPrefix: '清空通知历史失败：',
     run: async () => {
@@ -264,7 +306,7 @@ export function useDashboardData(onNavigateToSession: (sessionId: string, entrie
   })
 
   return {
-    status, config, entries, busy, checking, hookBusy, hookProgress, lastStatusAt, errorMessage,
+    status, config, entries, busy, checking, hookBusy, hookProgress, lastStatusAt, errorMessage, destructiveBusy,
     setErrorMessage, refresh, checkNow, saveConfig, reconnect, rehook, removeHook, markEntryRead, markSessionRead, removeEntry, clearEntries
   }
 }
